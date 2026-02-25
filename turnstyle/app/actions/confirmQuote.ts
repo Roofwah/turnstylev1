@@ -3,21 +3,88 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
-export async function confirmQuote(campaignId: string) {
+export async function confirmQuote(campaignId: string, approvedById?: string) {
   const now = new Date()
 
-  await prisma.campaign.update({
-    where: { id: campaignId },
-    data:  { status: 'CONFIRMATION' },
-  })
+  try {
+    // First, validate that the campaign exists
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+    })
 
-  await prisma.quote.updateMany({
-    where:  { campaignId, status: 'DRAFT' },
-    data:   { status: 'ACCEPTED', approvedAt: now },
-  })
+    if (!campaign) {
+      throw new Error(`Campaign with id ${campaignId} not found`)
+    }
 
-  revalidatePath('/dashboard')
-  revalidatePath(`/dashboard/${campaignId}`)
+    // Get all DRAFT quotes for this campaign
+    const draftQuotes = await prisma.quote.findMany({
+      where: {
+        campaignId,
+        status: 'DRAFT',
+      },
+    })
 
-  return { confirmedAt: now.toISOString() }
+    if (draftQuotes.length === 0) {
+      throw new Error('No DRAFT quotes found for this campaign. Please generate a quote first.')
+    }
+
+    // Use a transaction to ensure atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // Update campaign status
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: { status: 'CONFIRMATION' },
+      })
+
+      // Update all DRAFT quotes to ACCEPTED and create ApprovalRecords
+      const updatedQuotes = []
+      
+      for (const quote of draftQuotes) {
+        // Update the quote
+        const updatedQuote = await tx.quote.update({
+          where: { id: quote.id },
+          data: {
+            status: 'ACCEPTED',
+            approvedAt: now,
+            ...(approvedById && { approvedById }),
+          },
+        })
+
+        // Create ApprovalRecord for this quote
+        // Note: approvedById is required for ApprovalRecord, so we need a user ID
+        // For now, if no approvedById is provided, we'll skip creating the record
+        // This can be updated when authentication is fully implemented
+        if (approvedById) {
+          await tx.approvalRecord.create({
+            data: {
+              quoteId: quote.id,
+              campaignId: campaignId,
+              approvedById: approvedById,
+              approvedAt: now,
+              totalSnapshot: quote.totalExGst,
+              quoteHashSnapshot: quote.quoteHash,
+            },
+          })
+        }
+
+        updatedQuotes.push(updatedQuote)
+      }
+
+      return { updatedQuotes, count: updatedQuotes.length }
+    })
+
+    revalidatePath('/dashboard')
+    revalidatePath(`/dashboard/${campaignId}`)
+
+    return {
+      confirmedAt: now.toISOString(),
+      quotesApproved: result.count,
+      message: `Successfully approved ${result.count} quote(s)`,
+    }
+  } catch (error) {
+    console.error('Error confirming quote:', error)
+    throw error instanceof Error
+      ? error
+      : new Error('Failed to confirm quote. Please try again.')
+  }
 }
