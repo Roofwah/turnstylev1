@@ -125,7 +125,7 @@ else if (startDays === 0)                countdownLabel = 'Starts today'
 } else if (['ACTIVE','LIVE'].includes(campaign.status)) {
 if (endDays !== null && endDays > 0) countdownLabel = `${endDays} days to end`
 else if (endDays === 0)              countdownLabel = 'Ends today'
-  } else if (campaign.status === 'CLOSED') {
+  } else if (campaign.status === 'ARCHIVED') {
     countdownLabel = 'Awaiting draw'
   }
 
@@ -140,13 +140,10 @@ else if (endDays === 0)              countdownLabel = 'Ends today'
     DRAFT:        { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
     CONFIRMATION: { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
     APPROVED:     { label: 'Quote Approved ✓',        color: 'text-emerald-400' },
-    REVIEW:       { label: 'In Review',               color: 'text-blue-400' },
-    PENDING:      { label: 'Awaiting Permits',        color: 'text-purple-400' },
-    SCHEDULED:    { label: 'Scheduled — Ready',       color: 'text-emerald-400' },
-    LIVE:         { label: '🔴 Live Now',             color: 'text-red-400' },
-    CLOSED:       { label: 'Closed — Awaiting Draw',  color: 'text-white/40' },
-    DRAWN:        { label: 'Drawn — Archiving soon',  color: 'text-white/40' },
+    QUOTE_SENT:   { label: 'Quote Sent',              color: 'text-amber-400' },
+    ACTIVE:       { label: 'Active',                  color: 'text-blue-400' },
     ARCHIVED:     { label: 'Archived',                color: 'text-white/20' },
+    // Note: REVIEW, PENDING, SCHEDULED, LIVE, CLOSED, DRAWN will be available after migration
   }
   // Use effective status (based on quote approval) for CTA
   const cta = ctas[effectiveStatus]
