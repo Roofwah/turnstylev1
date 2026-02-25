@@ -33,15 +33,28 @@ export async function createCampaign(data: {
     },
   })
 
-  // Create campaign
-  // Note: createdById is hardcoded for now — will use real auth session later
-  const TEMP_USER_ID = 'admin-user-001'
+  // Get or create default admin user
+  // Note: This is a temporary solution until real auth is implemented
+  const TEMP_USER_EMAIL = 'admin@turnstyle.com'
+  const TEMP_USER_NAME = 'Admin User'
+  
+  const adminUser = await prisma.user.upsert({
+    where: { email: TEMP_USER_EMAIL },
+    update: {}, // Don't update if exists
+    create: {
+      email: TEMP_USER_EMAIL,
+      name: TEMP_USER_NAME,
+      passwordHash: 'temp-password-hash', // Will be replaced when auth is implemented
+      role: 'ADMIN',
+      isActive: true,
+    },
+  })
 
   const campaign = await prisma.campaign.create({
     data: {
       tsCode: data.tsCode,
       promoterId: promoter.id,
-      createdById: TEMP_USER_ID,
+      createdById: adminUser.id,
       name: data.campaignName,
       promoStart: data.promoStart ? new Date(data.promoStart) : null,
       promoEnd: data.promoEnd ? new Date(data.promoEnd) : null,
