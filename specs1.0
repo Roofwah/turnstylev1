@@ -1,0 +1,255 @@
+
+
+Turnstyle v0.4
+
+Promotional Campaign Builder & Compliance Automation Platform
+
+⸻
+
+1. System Overview
+
+Turnstyle is a modular promotional campaign automation platform built to:
+	•	Capture structured campaign configuration data
+	•	Dynamically generate pricing and compliance outputs
+	•	Produce abbreviated and full terms & conditions
+	•	Manage internal approvals
+	•	Generate QR and public-facing outputs
+	•	Maintain structured campaign records
+
+The system is currently built on:
+	•	WordPress (CPT architecture)
+	•	Elementor (UI layer)
+	•	Custom Turnstyle plugins (business logic layer)
+	•	REST endpoints for ingestion and storage
+
+⸻
+
+2. Authentication & Entry Layer
+
+Login / Access
+
+User enters via:
+	•	Root 5-character campaign routing
+	•	Admin login
+	•	Builder access page
+
+The system resolves:
+	•	ts_code
+	•	ts_post_id
+	•	User role / session state
+
+Validation ensures:
+	•	Valid campaign ID
+	•	Authorized access
+	•	Required fields present before progression
+
+⸻
+
+3. Campaign Build Form (Campaign Configuration Engine)
+
+Function:
+
+Collect structured campaign parameters.
+
+Captured Data Model:
+	•	Campaign name
+	•	Promoter entity
+	•	Promotion dates
+	•	Mechanic type
+	•	Entry mechanic
+	•	Regions / states
+	•	Prize tiers
+	•	Prize values
+	•	Draw frequency
+	•	Contact details
+
+Output:
+
+Creates or updates a Campaign CPT record.
+
+Stored as:
+	•	Post meta
+	•	Structured JSON payload
+	•	Version controlled
+
+Validation:
+	•	Required field enforcement
+	•	Date logic validation
+	•	Conditional visibility rules
+	•	Prize value calculation cross-check
+
+⸻
+
+4. Command Centre (Campaign Control Panel)
+
+Function:
+
+Central operational dashboard for a campaign.
+
+Displays:
+	•	Campaign metadata
+	•	Quote status
+	•	Terms status
+	•	Approval state
+	•	Generated assets
+	•	QR code
+	•	Version history
+
+Acts as orchestration layer between:
+	•	Summary Editor
+	•	Quote Engine
+	•	Terms Engine
+	•	Approval Panel
+
+⸻
+
+5. Quote Builder (Commercial Engine)
+
+Function:
+
+Calculate campaign cost dynamically.
+
+Components:
+	•	Terms drafting fee
+	•	Management fee
+	•	Permit fee logic (state-based threshold logic)
+	•	Draw management
+	•	Prize tiers complexity
+
+Logic:
+	•	Rule-based pricing engine
+	•	Conditional pricing adjustments
+	•	GST handling
+
+Output:
+	•	Structured quote object
+	•	HTML export
+	•	Email trigger
+	•	Status: Draft → Approved
+
+Stored in:
+	•	Post meta
+	•	JSON object
+	•	Snapshot at approval
+
+⸻
+
+6. Summary Editor (Structured Campaign Narrative Engine)
+
+Function:
+
+Editable structured narrative derived from campaign data.
+
+Two-way relationship:
+
+When Build Form Updates:
+	•	Summary auto-populates structured content
+
+When Summary Editor Changes:
+	•	Summary changes update stored meta
+	•	Command Centre reflects changes
+	•	Quote recalculates if dependent fields altered
+	•	Abbreviated Terms regenerate
+
+This creates a reactive data chain.
+
+⸻
+
+7. Quote Approval Panel
+
+Function:
+
+Formal commercial authorization gate.
+
+On Approval:
+	•	Stores:
+	•	Approved by
+	•	Timestamp
+	•	Total ex GST
+	•	Locks commercial snapshot
+	•	Enables:
+	•	Abbreviated Terms
+	•	Full Terms Wizard
+	•	Final outputs
+
+Acts as system unlock trigger.
+
+⸻
+
+8. Abbreviated Terms Engine
+
+Function:
+
+Generate compliant short-form promotional terms.
+
+Logic:
+	•	Pulls structured campaign data
+	•	Injects into templated legal clauses
+	•	State permit references
+	•	Draw details
+	•	Prize descriptions
+
+Output:
+	•	HTML export
+	•	PDF-ready
+	•	Versioned
+
+Templates stored as:
+	•	Structured clause libraries
+	•	Token-based merge variables
+	•	CPT or database stored legal blocks
+
+⸻
+
+9. QR Code Generator
+
+Function:
+
+Generate public entry QR linked to:
+	•	Campaign URL
+	•	Landing page
+	•	Entry endpoint
+
+Uses:
+	•	Campaign ID routing
+	•	Root-based short routing
+	•	Dynamic generation via library
+
+Stored as:
+	•	Image asset
+	•	Embedded display in Command Centre
+
+⸻
+
+10. Full Terms Wizard (Post-Approval Legal Builder)
+
+Triggered only after:
+	•	Quote status = Approved
+
+Function:
+
+Step-by-step structured full legal document generator.
+
+Flow:
+	1.	Campaign core data locked
+	2.	Wizard collects advanced legal nuance
+	3.	Conditional clauses injected
+	4.	State-specific compliance logic applied
+	5.	Prize structure clauses expanded
+	6.	Draw procedure detail inserted
+	7.	Dispute & liability clauses appended
+
+Templates:
+	•	Modular clause storage
+	•	Jurisdiction-based variants
+	•	Permit-threshold logic blocks
+
+Output:
+	•	Full T&Cs HTML
+	•	PDF export
+	•	Versioned record
+	•	Approval timestamp
+
+⸻
+
+11. Data Flow Architecture (Current WordPress Model)
