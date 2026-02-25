@@ -40,11 +40,20 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
       const approvedQuotes = allQuotes.filter(q => q.status === QuoteStatus.APPROVED)
       
       if (approvedQuotes.length > 0) {
-        // Quotes are already approved - return success without making changes
+        // Quotes are already approved - ensure campaign status is also APPROVED
+        if (campaign.status !== CampaignStatus.APPROVED) {
+          await prisma.campaign.update({
+            where: { id: campaignId },
+            data: { status: CampaignStatus.APPROVED },
+          })
+          revalidatePath('/dashboard')
+          revalidatePath(`/dashboard/${campaignId}`)
+        }
+        
         return {
-          confirmedAt: new Date().toISOString(),
+          confirmedAt: approvedQuotes[0].approvedAt?.toISOString() || new Date().toISOString(),
           quotesApproved: approvedQuotes.length,
-          message: `Quote(s) already approved. No changes made.`,
+          message: `Quote(s) already approved.`,
           alreadyApproved: true,
         }
       }

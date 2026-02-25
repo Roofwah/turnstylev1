@@ -98,8 +98,11 @@ export default async function DashboardPage() {
           <div className="space-y-3">
             
             {campaigns.map(campaign => {
-  const status = statusConfig[campaign.status] ?? statusConfig.DRAFT
   const latestQuote = campaign.quotes[0]
+  // Check if quote is approved - if so, campaign should show as APPROVED
+  const hasApprovedQuote = latestQuote?.status === 'APPROVED'
+  const effectiveStatus = hasApprovedQuote ? 'APPROVED' : campaign.status
+  const status = statusConfig[effectiveStatus] ?? statusConfig.DRAFT
   const AU_STATES = ['NSW','VIC','QLD','SA','WA','ACT','TAS','NT']
   const r = campaign.regions
   const regionParts: string[] = []
@@ -136,6 +139,7 @@ else if (endDays === 0)              countdownLabel = 'Ends today'
   const ctas: Record<string, { label: string; color: string }> = {
     DRAFT:        { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
     CONFIRMATION: { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
+    APPROVED:     { label: 'Quote Approved ✓',        color: 'text-emerald-400' },
     REVIEW:       { label: 'In Review',               color: 'text-blue-400' },
     PENDING:      { label: 'Awaiting Permits',        color: 'text-purple-400' },
     SCHEDULED:    { label: 'Scheduled — Ready',       color: 'text-emerald-400' },
@@ -144,7 +148,8 @@ else if (endDays === 0)              countdownLabel = 'Ends today'
     DRAWN:        { label: 'Drawn — Archiving soon',  color: 'text-white/40' },
     ARCHIVED:     { label: 'Archived',                color: 'text-white/20' },
   }
-  const cta = ctas[campaign.status]
+  // Use effective status (based on quote approval) for CTA
+  const cta = ctas[effectiveStatus]
 
   return (
     <Link

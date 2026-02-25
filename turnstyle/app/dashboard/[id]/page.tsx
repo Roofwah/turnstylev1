@@ -96,11 +96,15 @@ function formatRegions(regions: string[]) {
 }
 
 function normaliseCampaign(raw: any): Campaign {
+  // Check if any quotes are approved - if so, effective status should be APPROVED
+  const hasApprovedQuote = raw.quotes?.some((q: any) => q.status === 'APPROVED')
+  const effectiveStatus = hasApprovedQuote ? 'APPROVED' : (raw.status ?? 'DRAFT')
+  
   return {
     id:            raw.id,
     tsCode:        raw.tsCode ?? '',
     name:          raw.name ?? '',
-    status:        raw.status ?? 'DRAFT',
+    status:        effectiveStatus,
     promoter:      raw.promoter ?? null,
     promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
     promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
