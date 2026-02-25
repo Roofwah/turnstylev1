@@ -1,0 +1,255 @@
+// Turnstyle - Prisma Schema
+// Run: npx prisma migrate dev --name init
+// DB:  DATABASE_URL="postgresql://user:pass@localhost:5432/turnstyle"
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(CLIENT)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  campaigns        Campaign[]
+  approvals        ApprovalRecord[]
+  summaryEdits     Summary[]
+  generatedDocs    GeneratedDocument[]
+  auditLogs        AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  CLIENT
+}
+
+model Promoter {
+  id           String   @id @default(uuid())
+  name         String
+  abn          String?
+  contactName  String?  @map("contact_name")
+  contactEmail String?  @map("contact_email")
+  contactPhone String?  @map("contact_phone")
+  address      Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  campaigns Campaign[]
+
+  @@map("promoters")
+}
+
+model Campaign {
+  id             String         @id @default(uuid())
+  tsCode         String         @unique @map("ts_code")
+  promoterId     String?        @map("promoter_id")
+  createdById    String         @map("created_by_id")
+  name           String
+  promoStart     DateTime?      @map("promo_start") @db.Date
+  promoEnd       DateTime?      @map("promo_end") @db.Date
+  mechanicType   MechanicType   @default(OTHER) @map("mechanic_type")
+  entryMechanic  String?        @map("entry_mechanic")
+  drawFrequency  DrawFrequency  @default(AT_CONCLUSION) @map("draw_frequency")
+  regions        String[]
+  prizes         Json           @default("[]")
+  prizePoolTotal Decimal        @default(0) @map("prize_pool_total") @db.Decimal(12, 2)
+  notes          String?
+  status         CampaignStatus @default(DRAFT)
+  version        Int            @default(1)
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  promoter      Promoter?           @relation(fields: [promoterId], references: [id])
+  createdBy     User                @relation(fields: [createdById], references: [id])
+  quotes        Quote[]
+  summaries     Summary[]
+  documents     GeneratedDocument[]
+  auditLogs     AuditLog[]
+
+  @@map("campaigns")
+}
+
+enum MechanicType {
+  SWEEPSTAKES
+  LIMITED_OFFER
+  INSTANT_WIN
+  OTHER
+}
+
+enum DrawFrequency {
+  AT_CONCLUSION
+  DAILY
+  WEEKLY
+  FORTNIGHTLY
+  MONTHLY
+  HOURLY
+}
+
+enum CampaignStatus {
+  DRAFT
+  CONFIRMATION
+  REVIEW
+  PENDING
+  SCHEDULED
+  LIVE
+  CLOSED
+  DRAWN
+  ARCHIVED
+}
+
+model Quote {
+  id             String      @id @default(uuid())
+  campaignId     String      @map("campaign_id")
+  quoteNumber    String      @map("quote_number")
+  quoteHash      String      @map("quote_hash")
+  status         QuoteStatus @default(DRAFT)
+  termsFee       Decimal     @map("terms_fee") @db.Decimal(10, 2)
+  mgmtFee        Decimal     @map("mgmt_fee") @db.Decimal(10, 2)
+  permitFee      Decimal     @map("permit_fee") @db.Decimal(10, 2)
+  drawFee        Decimal     @map("draw_fee") @db.Decimal(10, 2)
+  totalExGst     Decimal     @map("total_ex_gst") @db.Decimal(10, 2)
+  gstAmount      Decimal     @map("gst_amount") @db.Decimal(10, 2)
+  totalIncGst    Decimal     @map("total_inc_gst") @db.Decimal(10, 2)
+  currency       String      @default("AUD")
+  validUntil     DateTime    @map("valid_until") @db.Date
+  engineVersion  String      @map("engine_version")
+  snapshotJson   Json        @map("snapshot_json")
+  approvedAt     DateTime?   @map("approved_at")
+  approvedById   String?     @map("approved_by_id")
+  createdAt      DateTime    @default(now()) @map("created_at")
+
+  campaign  Campaign        @relation(fields: [campaignId], references: [id])
+  approval  ApprovalRecord?
+
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  ACCEPTED
+  SUPERSEDED
+  EXPIRED
+}
+
+model ApprovalRecord {
+  id                String   @id @default(uuid())
+  quoteId           String   @unique @map("quote_id")
+  campaignId        String   @map("campaign_id")
+  approvedById      String   @map("approved_by_id")
+  approvedAt        DateTime @map("approved_at")
+  totalSnapshot     Decimal  @map("total_snapshot") @db.Decimal(10, 2)
+  quoteHashSnapshot String   @map("quote_hash_snapshot")
+  notes             String?
+  ipAddress         String?  @map("ip_address")
+
+  quote      Quote @relation(fields: [quoteId], references: [id])
+  approvedBy User  @relation(fields: [approvedById], references: [id])
+
+  @@map("approval_records")
+}
+
+model Summary {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  version    Int
+  contentJson Json    @map("content_json")
+  isCurrent  Boolean  @default(true) @map("is_current")
+  editedById String   @map("edited_by_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  editedBy User     @relation(fields: [editedById], references: [id])
+
+  @@unique([campaignId, version])
+  @@map("summaries")
+}
+
+model TermsTemplate {
+  id           String       @id @default(uuid())
+  name         String
+  type         TemplateType
+  jurisdiction String
+  version      Int
+  isActive     Boolean      @default(true) @map("is_active")
+  clausesJson  Json         @map("clauses_json")
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  clauses TermsClause[]
+
+  @@map("terms_templates")
+}
+
+enum TemplateType {
+  ABBREVIATED
+  FULL
+}
+
+model TermsClause {
+  id            String  @id @default(uuid())
+  templateId    String  @map("template_id")
+  slug          String
+  title         String
+  bodyHtml      String  @map("body_html")
+  conditionJson Json?   @map("condition_json")
+  jurisdiction  String
+  version       Int
+  isActive      Boolean @default(true) @map("is_active")
+
+  template TermsTemplate @relation(fields: [templateId], references: [id])
+
+  @@map("terms_clauses")
+}
+
+model GeneratedDocument {
+  id            String       @id @default(uuid())
+  campaignId    String       @map("campaign_id")
+  type          DocumentType
+  version       Int
+  s3Key         String?      @map("s3_key")
+  s3Url         String?      @map("s3_url")
+  mimeType      String       @map("mime_type")
+  generatedAt   DateTime     @default(now()) @map("generated_at")
+  generatedById String       @map("generated_by_id")
+  expiresAt     DateTime?    @map("expires_at")
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id])
+  generatedBy User     @relation(fields: [generatedById], references: [id])
+
+  @@map("generated_documents")
+}
+
+enum DocumentType {
+  QUOTE
+  ABBREV_TERMS
+  FULL_TERMS
+  QR_CODE
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  entityType   String   @map("entity_type")
+  entityId     String   @map("entity_id")
+  action       String
+  actorId      String   @map("actor_id")
+  diffJson     Json?    @map("diff_json")
+  metadataJson Json?    @map("metadata_json")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_log")
+}
