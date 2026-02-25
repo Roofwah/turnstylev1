@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
-import { QuoteStatus } from '@prisma/client'
+import { QuoteStatus, CampaignStatus } from '@prisma/client'
 
 export async function updateCampaign(id: string, data: {
   name?: string
@@ -26,6 +26,61 @@ export async function updateCampaign(id: string, data: {
   const prizePoolTotal = data.prizes
     ? data.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
     : undefined
+
+  // Define quote-affecting fields that should invalidate approval
+  const quoteAffectingFields: (keyof typeof data)[] = [
+    'promoStart', 'promoEnd', 'drawMechanic', 'drawFrequency', 'prizes', 'regions'
+  ]
+  
+  // Check if any quote-affecting fields are being changed
+  const hasQuoteAffectingChanges = quoteAffectingFields.some(field => data[field] !== undefined)
+  
+  // If quote-affecting changes are made, check for approved quotes and revert them
+  if (hasQuoteAffectingChanges) {
+    const approvedQuotes = await prisma.quote.findMany({
+      where: {
+        campaignId: id,
+        status: QuoteStatus.APPROVED,
+      },
+    })
+    
+    if (approvedQuotes.length > 0) {
+      // Get quote IDs before updating
+      const approvedQuoteIds = approvedQuotes.map(q => q.id)
+      
+      // Delete ApprovalRecords for these quotes (one-to-one relationship)
+      await prisma.approvalRecord.deleteMany({
+        where: {
+          quoteId: { in: approvedQuoteIds },
+        },
+      })
+      
+      // Revert approved quotes back to DRAFT and clear approval data
+      await prisma.quote.updateMany({
+        where: {
+          campaignId: id,
+          status: QuoteStatus.APPROVED,
+        },
+        data: {
+          status: QuoteStatus.DRAFT,
+          approvedAt: null,
+          approvedById: null,
+        },
+      })
+      
+      // Also check if campaign status is APPROVED and revert it to DRAFT
+      const campaign = await prisma.campaign.findUnique({
+        where: { id },
+        select: { status: true },
+      })
+      
+      if (campaign?.status === CampaignStatus.APPROVED) {
+        // Campaign status will be updated below with revertToDraft flag
+        // But we'll ensure it happens even if revertToDraft wasn't explicitly set
+        data.revertToDraft = true
+      }
+    }
+  }
 
   const frequencyMap: Record<string, any> = {
     at_conclusion: 'AT_CONCLUSION',
@@ -54,7 +109,7 @@ export async function updateCampaign(id: string, data: {
       ...(data.regions       !== undefined && { regions: data.regions }),
       ...(data.prizes        && { prizes: data.prizes, prizePoolTotal }),
       ...(data.notes         !== undefined && { notes: data.notes }),
-      ...(data.revertToDraft && { status: 'DRAFT' }),
+      ...(data.revertToDraft && { status: CampaignStatus.DRAFT }),
     },
   })
 
