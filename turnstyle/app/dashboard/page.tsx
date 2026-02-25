@@ -26,16 +26,29 @@ function daysUntil(d: Date | null, nowMs: number): number | null {
 }
 
 export default async function DashboardPage() {
-  const campaigns = await prisma.campaign.findMany({
-    include: {
-      promoter: true,
-      quotes: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
+  let campaigns
+  try {
+    campaigns = await prisma.campaign.findMany({
+      include: {
+        promoter: true,
+        quotes: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+      orderBy: { createdAt: 'desc' },
+    })
+  } catch (error) {
+    console.error('Error fetching campaigns:', error)
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-400 text-sm mb-4">Error loading campaigns</p>
+          <p className="text-white/40 text-xs">{error instanceof Error ? error.message : 'Unknown error'}</p>
+        </div>
+      </div>
+    )
+  }
 
   const now = new Date()
   const nowMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
@@ -98,7 +111,7 @@ export default async function DashboardPage() {
           <div className="space-y-3">
             
             {campaigns.map(campaign => {
-  const latestQuote = campaign.quotes[0]
+  const latestQuote = campaign.quotes?.[0]
   // Check if quote is approved - if so, campaign should show as APPROVED
   const hasApprovedQuote = latestQuote?.status === 'APPROVED'
   const effectiveStatus = hasApprovedQuote ? 'APPROVED' : campaign.status
