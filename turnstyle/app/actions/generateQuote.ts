@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { calculateQuote } from '@/lib/quote-engine'
 import { revalidatePath } from 'next/cache'
+import { QuoteStatus } from '@prisma/client'
 
 export async function generateQuote(campaignId: string) {
   const raw = await prisma.campaign.findUnique({
@@ -33,8 +34,8 @@ export async function generateQuote(campaignId: string) {
 
   // Supersede any existing draft quotes
   await prisma.quote.updateMany({
-    where: { campaignId, status: 'DRAFT' },
-    data:  { status: 'SUPERSEDED' },
+    where: { campaignId, status: QuoteStatus.DRAFT },
+    data:  { status: QuoteStatus.SUPERSEDED },
   })
 
   // Save new quote
@@ -43,7 +44,7 @@ export async function generateQuote(campaignId: string) {
       campaignId,
       quoteNumber:   quote.quoteNumber,
       quoteHash:     quote.quoteHash,
-      status:        'DRAFT',
+      status:        QuoteStatus.DRAFT,
       termsFee:      quote.lines.find((l: any) => l.key === 'terms')?.amount ?? 0,
       mgmtFee:       quote.lines.find((l: any) => l.key === 'mgmt')?.amount ?? 0,
       permitFee:     quote.lines.find((l: any) => l.key === 'permit')?.amount ?? 0,

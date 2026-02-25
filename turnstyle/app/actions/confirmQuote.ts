@@ -17,16 +17,30 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
       throw new Error(`Campaign with id ${campaignId} not found`)
     }
 
+    // Get all quotes for this campaign to check what exists
+    const allQuotes = await prisma.quote.findMany({
+      where: { campaignId },
+      select: { id: true, status: true, quoteNumber: true },
+    })
+
+    if (allQuotes.length === 0) {
+      throw new Error('No quotes found for this campaign. Please generate a quote first.')
+    }
+
     // Get all DRAFT quotes for this campaign
     const draftQuotes = await prisma.quote.findMany({
       where: {
         campaignId,
-        status: 'DRAFT',
+        status: QuoteStatus.DRAFT,
       },
     })
 
     if (draftQuotes.length === 0) {
-      throw new Error('No DRAFT quotes found for this campaign. Please generate a quote first.')
+      const existingStatuses = allQuotes.map(q => q.status).join(', ')
+      throw new Error(
+        `No DRAFT quotes found for this campaign. Found quotes with status: ${existingStatuses}. ` +
+        'If quotes are already approved, you may need to create a new quote or update the existing ones.'
+      )
     }
 
     // Use a transaction to ensure atomicity

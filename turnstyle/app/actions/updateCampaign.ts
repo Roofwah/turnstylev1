@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { QuoteStatus } from '@prisma/client'
 
 export async function updateCampaign(id: string, data: {
   name?: string
@@ -95,7 +96,7 @@ export async function updateCampaign(id: string, data: {
     })
 
     await prisma.quote.updateMany({
-      where: { campaignId: id, status: 'DRAFT' },
+      where: { campaignId: id, status: QuoteStatus.DRAFT },
       data: {
         quoteNumber:  quote.quoteNumber,
         quoteHash:    quote.quoteHash,

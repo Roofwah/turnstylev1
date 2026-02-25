@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
+import { QuoteStatus } from '@prisma/client'
 
 export async function createCampaign(data: {
   promoterName: string
@@ -87,7 +88,7 @@ await prisma.quote.create({
     campaignId:    campaign.id,
     quoteNumber:   quote.quoteNumber,
     quoteHash:     quote.quoteHash,
-    status:        'DRAFT',
+    status:        QuoteStatus.DRAFT,
     termsFee:      quote.termsFee,
     mgmtFee:       quote.mgmtFee,
     permitFee:     quote.permitFee,
