@@ -40,6 +40,7 @@ interface Campaign {
   regions: string[]
   prizes: PrizeTier[]
   notes: string
+  quotes?: { id: string; status: string; quoteNumber: string; approvedAt?: string | null }[]
   auditLogs?: { id: string; action: string; actorId: string; createdAt: string }[]
 }
 
@@ -111,6 +112,12 @@ function normaliseCampaign(raw: any): Campaign {
     regions:       raw.regions ?? [],
     prizes:        Array.isArray(raw.prizes) ? raw.prizes : [],
     notes:         raw.notes ?? '',
+    quotes:        raw.quotes?.map((q: any) => ({
+      id: q.id,
+      status: q.status,
+      quoteNumber: q.quoteNumber,
+      approvedAt: q.approvedAt,
+    })) ?? [],
     auditLogs:     raw.auditLogs ?? [],
   }
 }
@@ -251,7 +258,7 @@ const daysUntilFn = (d: string | null) => {
 const startDays = daysUntilFn(source.promoStart)
 const endDays   = daysUntilFn(source.promoEnd)
 let countdownLabel: string | null = null
-if (['DRAFT','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
   if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
   else if (startDays === 0) countdownLabel = 'Starts today'
   else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -426,7 +433,7 @@ if (['DRAFT','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.st
   const startDays = daysUntil(source.promoStart)
   const endDays   = daysUntil(source.promoEnd)
   let countdownLabel: string | null = null
-  if (['DRAFT','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+  if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
     if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
     else if (startDays === 0) countdownLabel = 'Starts today'
     else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -472,22 +479,31 @@ if (['DRAFT','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.st
         {permitStates.length === 0 && (
           <span className="text-white/20 text-xs">No permits required</span>
         )}  <div className="ml-auto">
-        {campaign.status === 'CONFIRMATION' ? (
-          <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
-            <span className="text-emerald-400 text-sm">✓</span>
-            <span className="text-emerald-400 text-xs font-bold">Quote Confirmed</span>
-          </div>
-        ) : (
-          <button
-            onClick={async () => {
-              const result = await confirmQuote(id)
-              setConfirmedAt(result.confirmedAt)
-              setCampaign(prev => prev ? { ...prev, status: 'CONFIRMATION' } : prev)
-            }}
-            className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-1.5 rounded-md hover:bg-white/90 transition-all">
-            Confirm & Proceed →
-          </button>
-        )}
+        {(() => {
+          const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
+          const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
+          
+          return isApproved ? (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <span className="text-emerald-400 text-xs font-bold">Quote Confirmed</span>
+            </div>
+          ) : (
+            <button
+              onClick={async () => {
+                try {
+                  const result = await confirmQuote(id)
+                  setConfirmedAt(result.confirmedAt)
+                  setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
+                } catch (error) {
+                  alert(error instanceof Error ? error.message : 'Failed to confirm quote')
+                }
+              }}
+              className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-1.5 rounded-md hover:bg-white/90 transition-all">
+              Confirm & Proceed →
+            </button>
+          )
+        })()}
       </div>
       </div>
     </>
@@ -708,25 +724,39 @@ if (['DRAFT','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.st
               </div>
             </div>
             <div className="flex gap-3">
-            {campaign.status === 'CONFIRMATION' ? (
-  <div className="flex-1 bg-emerald-400/10 border border-emerald-400/20 rounded-xl py-3 px-4 flex items-center gap-2">
-    <span className="text-emerald-400 text-lg">✓</span>
-    <div>
-      <div className="text-emerald-400 font-black text-sm">Quote Confirmed</div>
-      {confirmedAt && <div className="text-emerald-400/60 text-xs">{new Date(confirmedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>}
-    </div>
-  </div>
-) : (
-  <button
-    onClick={async () => {
-      const result = await confirmQuote(id)
-      setConfirmedAt(result.confirmedAt)
-      setCampaign(prev => prev ? { ...prev, status: 'CONFIRMATION' } : prev)
-    }}
-    className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-3 rounded-xl hover:bg-white/90 transition-all">
-    Confirm & Proceed →
-  </button>
-)}
+            {(() => {
+              const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
+              const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
+              const approvedQuote = campaign.quotes?.find(q => q.status === 'APPROVED')
+              
+              return isApproved ? (
+                <div className="flex-1 bg-emerald-400/10 border border-emerald-400/20 rounded-xl py-3 px-4 flex items-center gap-2">
+                  <span className="text-emerald-400 text-lg">✓</span>
+                  <div>
+                    <div className="text-emerald-400 font-black text-sm">Quote Confirmed</div>
+                    {(confirmedAt || approvedQuote?.approvedAt) && (
+                      <div className="text-emerald-400/60 text-xs">
+                        {new Date(confirmedAt || approvedQuote?.approvedAt || '').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={async () => {
+                    try {
+                      const result = await confirmQuote(id)
+                      setConfirmedAt(result.confirmedAt)
+                      setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
+                    } catch (error) {
+                      alert(error instanceof Error ? error.message : 'Failed to confirm quote')
+                    }
+                  }}
+                  className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-3 rounded-xl hover:bg-white/90 transition-all">
+                  Confirm & Proceed →
+                </button>
+              )
+            })()}
               
               
               

@@ -36,10 +36,24 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
     })
 
     if (draftQuotes.length === 0) {
+      // Check if quotes are already approved
+      const approvedQuotes = allQuotes.filter(q => q.status === QuoteStatus.APPROVED)
+      
+      if (approvedQuotes.length > 0) {
+        // Quotes are already approved - return success without making changes
+        return {
+          confirmedAt: new Date().toISOString(),
+          quotesApproved: approvedQuotes.length,
+          message: `Quote(s) already approved. No changes made.`,
+          alreadyApproved: true,
+        }
+      }
+      
+      // No draft quotes and no approved quotes - need to generate a quote
       const existingStatuses = allQuotes.map(q => q.status).join(', ')
       throw new Error(
         `No DRAFT quotes found for this campaign. Found quotes with status: ${existingStatuses}. ` +
-        'If quotes are already approved, you may need to create a new quote or update the existing ones.'
+        'Please generate a new quote first.'
       )
     }
 
