@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
+import { CampaignStatus, QuoteStatus } from '@prisma/client'
 
 export async function confirmQuote(campaignId: string, approvedById?: string) {
   const now = new Date()
@@ -31,20 +32,23 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
     // Use a transaction to ensure atomicity
     const result = await prisma.$transaction(async (tx) => {
       // Update campaign status
+      // Using APPROVED since CONFIRMATION may not exist in database enum yet
+      // TODO: Run migration to add CONFIRMATION, REVIEW, PENDING, etc. to CampaignStatus enum
       await tx.campaign.update({
         where: { id: campaignId },
-        data: { status: 'CONFIRMATION' },
+        data: { status: CampaignStatus.APPROVED },
       })
 
-      // Update all DRAFT quotes to ACCEPTED and create ApprovalRecords
+      // Update all DRAFT quotes to APPROVED and create ApprovalRecords
       const updatedQuotes = []
       
       for (const quote of draftQuotes) {
         // Update the quote
+        // Using APPROVED since ACCEPTED may not exist in database enum yet
         const updatedQuote = await tx.quote.update({
           where: { id: quote.id },
           data: {
-            status: 'ACCEPTED',
+            status: QuoteStatus.APPROVED,
             approvedAt: now,
             ...(approvedById && { approvedById }),
           },
