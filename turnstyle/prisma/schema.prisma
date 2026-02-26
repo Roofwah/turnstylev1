@@ -12,6 +12,9 @@ datasource db {
 }
 
 model User {
+  
+  promoterId       String?          @map("promoter_id")
+  promoter         Promoter?        @relation("UserPromoter", fields: [promoterId], references: [id])
   id           String   @id @default(uuid())
   email        String   @unique
   passwordHash String   @map("password_hash")
@@ -31,7 +34,9 @@ model User {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
+  AGENCY_ADMIN
   CLIENT
 }
 
@@ -42,7 +47,9 @@ model Promoter {
   contactName  String?  @map("contact_name")
   contactEmail String?  @map("contact_email")
   contactPhone String?  @map("contact_phone")
-  address      Json?
+  address      String?
+users        User[]            @relation("UserPromoter")
+templates    PromoterTemplate[]
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
@@ -56,7 +63,7 @@ model Campaign {
   tsCode         String         @unique @map("ts_code")
   promoterId     String?        @map("promoter_id")
   createdById    String         @map("created_by_id")
-  name           String
+  name           String         @unique
   promoStart     DateTime?      @map("promo_start") @db.Date
   promoEnd       DateTime?      @map("promo_end") @db.Date
   mechanicType   MechanicType   @default(OTHER) @map("mechanic_type")
@@ -77,8 +84,28 @@ model Campaign {
   summaries     Summary[]
   documents     GeneratedDocument[]
   auditLogs     AuditLog[]
+  termsDrafts   TermsDraft[]
 
   @@map("campaigns")
+}
+
+model PromoterTemplate {
+  id             String        @id @default(uuid())
+  promoterId     String        @map("promoter_id")
+  name           String
+  templateFileId String        @map("template_file_id")
+  entryMechanic  String?       @map("entry_mechanic")
+  regions        String[]
+  drawFrequency  DrawFrequency @default(AT_CONCLUSION) @map("draw_frequency")
+  mechanicType   MechanicType  @default(OTHER) @map("mechanic_type")
+  notes          String?
+  isActive       Boolean       @default(true) @map("is_active")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  promoter Promoter @relation(fields: [promoterId], references: [id])
+
+  @@map("promoter_templates")
 }
 
 enum MechanicType {
@@ -107,6 +134,24 @@ enum CampaignStatus {
   CLOSED
   DRAWN
   ARCHIVED
+}
+
+enum TermsDraftStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  LOCKED
+}
+
+enum CommentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
 }
 
 model Quote {
@@ -248,8 +293,59 @@ model AuditLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   actor User @relation(fields: [actorId], references: [id])
+  
+  @@map("audit_logs")
 
   @@index([entityType, entityId])
   @@index([actorId])
   @@map("audit_log")
+}
+
+model TermsDraft {
+  id          String   @id @default(uuid())
+  campaignId  String   @map("campaign_id")
+  version     Int      @default(1)
+  content     String
+  gapAnswers  Json
+  templateId  String   @map("template_id")
+  status      TermsDraftStatus @default(DRAFT)
+  shareToken  String   @unique @map("share_token")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  campaign  Campaign        @relation(fields: [campaignId], references: [id])
+  comments  TermsComment[]
+  approvals TermsApproval[]
+
+  @@map("terms_drafts")
+}
+
+model TermsComment {
+  id            String   @id @default(uuid())
+  termsDraftId  String   @map("terms_draft_id")
+  clauseSlug    String   @map("clause_slug")
+  authorName    String   @map("author_name")
+  authorEmail   String   @map("author_email")
+  body          String
+  status        CommentStatus @default(OPEN)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  draft TermsDraft @relation(fields: [termsDraftId], references: [id])
+
+  @@map("terms_comments")
+}
+
+model TermsApproval {
+  id            String   @id @default(uuid())
+  termsDraftId  String   @map("terms_draft_id")
+  approverName  String   @map("approver_name")
+  approverEmail String   @map("approver_email")
+  status        ApprovalStatus @default(PENDING)
+  note          String?
+  respondedAt   DateTime? @map("responded_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  draft TermsDraft @relation(fields: [termsDraftId], references: [id])
+
+  @@map("terms_approvals")
 }

@@ -1,0 +1,783 @@
+'use client'
+
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { useParams } from 'next/navigation'
+import { getCampaign } from '@/app/actions/getCampaign'
+import Link from 'next/link'
+import { REPCO_TRADE, TEMPLATE_META as REPCO_META } from '@/lib/terms-templates/repco-trade'
+import { NAPA_TRADE, TEMPLATE_META as NAPA_META } from '@/lib/terms-templates/napa-trade'
+
+// Template registry
+type TemplateData = {
+  clauses: Clause[]
+  meta: { id: string; name: string; promoterKeyword?: string; audience?: string }
+}
+
+const TEMPLATES: Record<string, TemplateData> = {
+  'repco-trade': {
+    clauses: REPCO_TRADE as Clause[],
+    meta: REPCO_META,
+  },
+  'napa-trade': {
+    clauses: NAPA_TRADE as Clause[],
+    meta: NAPA_META,
+  },
+}
+
+interface PrizeTier { tier: string; description: string; qty: number; unitValue: number }
+
+interface GapFollowUp {
+  key: string
+  question: string
+  placeholder?: string
+  multiline?: boolean
+  showWhen: number
+}
+
+interface Gap {
+  key: string
+  question: string
+  options?: string[]
+  optionLabels?: string[]
+  placeholder?: string
+  multiline?: boolean
+  followUp?: GapFollowUp
+}
+
+interface Clause {
+  slug: string
+  label: string
+  text: string
+  gaps?: Gap[]
+}
+
+type QuestionGap = Gap | GapFollowUp
+
+interface Question {
+  gap: QuestionGap
+  isFollowUp: boolean
+  parentGap?: Gap
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatMoney(n: number) {
+  return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2 })
+}
+
+function formatDateLong(d: string) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatRegion(regions: string[]) {
+  const AU = ['NSW','VIC','QLD','SA','WA','ACT','TAS','NT']
+  if (regions.includes('national_au')) return 'throughout Australia'
+  const states = regions.filter(r => AU.includes(r))
+  return states.length ? `in ${states.join(', ')}` : 'in selected regions'
+}
+
+function calcDrawDate(promoEnd: string) {
+  if (!promoEnd) return 'TBC'
+  const d = new Date(promoEnd)
+  let added = 0
+  while (added < 5) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) added++ }
+  return d.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function calcUnclaimed(promoEnd: string) {
+  if (!promoEnd) return { deadline: 'TBC', redraw: 'TBC' }
+  const d = new Date(promoEnd)
+  const dl = new Date(d); dl.setDate(dl.getDate() + 60)
+  const rd = new Date(dl); rd.setDate(rd.getDate() + 1)
+  return {
+    deadline: dl.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
+    redraw:   rd.toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }),
+  }
+}
+
+function normaliseCampaign(raw: any) {
+  const prizes: PrizeTier[] = Array.isArray(raw.prizes) ? raw.prizes : []
+  const prizePool = prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
+  const totalWinners = prizes.reduce((s, p) => s + p.qty, 0)
+  return {
+    id:            raw.id,
+    tsCode:        raw.tsCode ?? '',
+    name:          raw.name ?? '',
+    promoter:      raw.promoter ?? null,
+    promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
+    promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
+    drawMechanic:  raw.mechanicType === 'SWEEPSTAKES' ? 'Trade Lottery' : raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer' : 'Prize Draw',
+    entryMechanic: raw.entryMechanic ?? '',
+    regions:       raw.regions ?? [],
+    prizes,
+    prizePool,
+    totalWinners,
+    prizeList:     prizes.map(p => `${p.qty} x ${p.description} valued at ${formatMoney(p.unitValue)} (incl. GST)`).join('\n'),
+  }
+}
+
+// ─── Animated text ────────────────────────────────────────────────────────────
+
+function AnimatedText({ text }: { text: string }) {
+  const [shown, setShown] = useState('')
+  const [done, setDone]   = useState(false)
+  const prev = useRef('')
+
+  useEffect(() => {
+    // If text hasn't changed, don't re-run
+    if (text === prev.current) {
+      return
+    }
+    
+    prev.current = text
+    setDone(false)
+    
+    if (!text) { 
+      setShown('')
+      return 
+    }
+    
+    // Show text immediately
+    setShown(text)
+    setDone(true)
+    
+    // Optional: Uncomment below for word-by-word animation (18ms per word)
+    // setShown('')
+    // setDone(false)
+    // const words = text.split(' ')
+    // let i = 0
+    // const t = setInterval(() => {
+    //   i++
+    //   setShown(words.slice(0, i).join(' '))
+    //   if (i >= words.length) { clearInterval(t); setDone(true) }
+    // }, 18)
+    // return () => clearInterval(t)
+  }, [text])
+
+  if (!text) return <span className="text-gray-300 italic">Waiting for answer...</span>
+  
+  // Always show the text, even if animation hasn't started
+  const displayText = shown || text
+  
+  return (
+    <span>
+      {displayText}
+      {!done && displayText && <span className="inline-block w-0.5 h-3.5 bg-gray-500 ml-0.5 animate-pulse align-middle" />}
+    </span>
+  )
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+export default function TermsWizardPage() {
+  const params = useParams()
+  const id = params.id as string
+  const [campaign, setCampaign] = useState<any>(null)
+  const [loading, setLoading]   = useState(true)
+
+  // All gap answers keyed by gap key
+  const [answers, setAnswers] = useState<Record<string, string | number>>({})
+  const [sharing, setSharing]     = useState(false)
+  const [shareLink, setShareLink] = useState('')
+  const [copied, setCopied]       = useState(false)
+  
+  // Modal wizard state
+  const [showModal, setShowModal] = useState(false)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [showDocument, setShowDocument] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
+
+  function answer(key: string, value: string | number) {
+    setAnswers(prev => ({ ...prev, [key]: value }))
+  }
+
+  useEffect(() => {
+    getCampaign(id).then(raw => {
+      if (raw) {
+        const c = normaliseCampaign(raw)
+        setCampaign(c)
+        // Pre-fill calculated values
+        const uc = calcUnclaimed(c.promoEnd)
+        setAnswers({
+          UNCLAIMED_DEADLINE: uc.deadline,
+          UNCLAIMED_REDRAW:   uc.redraw,
+        })
+      }
+      setLoading(false)
+    })
+  }, [id])
+
+  // Type guard to check if gap is a full Gap (not just followUp)
+  function isFullGap(gap: QuestionGap): gap is Gap {
+    return 'options' in gap || 'optionLabels' in gap || 'followUp' in gap
+  }
+
+  // Get current template
+  const currentTemplate = TEMPLATES[selectedTemplate] || TEMPLATES['repco-trade']
+  const currentClauses = currentTemplate.clauses
+  const templateMeta = currentTemplate.meta
+
+  // Extract all gaps from all clauses into a flat array of questions
+  // Memoized to recalculate when answers or template change
+  const allQuestions: Question[] = useMemo(() => {
+    const questions: Question[] = []
+    
+    currentClauses.forEach((clause: Clause) => {
+      if (!clause.gaps) return
+      
+      clause.gaps.forEach((gap: Gap) => {
+        // Add main gap question
+        questions.push({ gap, isFollowUp: false })
+        
+        // Add follow-up question only if parent answer matches showWhen
+        if (gap.followUp) {
+          const parentAnswer = answers[gap.key]
+          if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
+            questions.push({ gap: gap.followUp, isFollowUp: true, parentGap: gap })
+          }
+        }
+      })
+    })
+    
+    return questions
+  }, [answers, currentClauses])
+
+  const totalQuestions = allQuestions.length
+
+  // Format promoter address (can be JSON object or string)
+  function formatAddress(address: any): string {
+    if (!address) return '[Address]'
+    if (typeof address === 'string') return address
+    if (typeof address === 'object') {
+      const parts = [
+        address.street,
+        address.suburb,
+        address.state,
+        address.postcode,
+      ].filter(Boolean)
+      return parts.join(', ') || '[Address]'
+    }
+    return '[Address]'
+  }
+
+  // Auto variables — memoized to update when answers or campaign changes
+  // Must be called before any conditional returns (Rules of Hooks)
+  const AUTO_VARS: Record<string, string> = useMemo(() => {
+    if (!campaign) {
+      return {
+        PROMOTER_NAME: '[Promoter name]',
+        PROMOTER_ABN: '[ABN]',
+        PROMOTER_ADDRESS: '[Address]',
+        PROMO_START: '[Start date]',
+        PROMO_END: '[End date]',
+        DRAW_MECHANIC: '[Draw mechanic]',
+        CAMPAIGN_URL: '[Campaign URL]',
+        REGION: '[Region]',
+        ENTRY_MECHANIC: '[entry mechanic]',
+        TOTAL_WINNERS: '0',
+        DRAW_DATE: '[Draw date]',
+        PRIZE_LIST: '[Prize list]',
+        PRIZE_POOL: '$0.00',
+        UNCLAIMED_DEADLINE: String(answers.UNCLAIMED_DEADLINE ?? '[deadline]'),
+        UNCLAIMED_REDRAW: String(answers.UNCLAIMED_REDRAW ?? '[redraw date]'),
+      }
+    }
+    
+    const campaignUrl = `https://turnstylehost.com/campaign/${campaign.tsCode.toLowerCase()}/`
+    const drawDate = calcDrawDate(campaign.promoEnd)
+    
+    return {
+      PROMOTER_NAME:    campaign.promoter?.name    ?? '[Promoter name]',
+      PROMOTER_ABN:     campaign.promoter?.abn     ?? '[ABN]',
+      PROMOTER_ADDRESS: formatAddress(campaign.promoter?.address),
+      PROMO_START:      formatDateLong(campaign.promoStart),
+      PROMO_END:        formatDateLong(campaign.promoEnd),
+      DRAW_MECHANIC:    campaign.drawMechanic,
+      CAMPAIGN_URL:     campaignUrl,
+      REGION:           formatRegion(campaign.regions),
+      ENTRY_MECHANIC:   campaign.entryMechanic || '[entry mechanic]',
+      TOTAL_WINNERS:    String(campaign.totalWinners),
+      DRAW_DATE:        drawDate,
+      PRIZE_LIST:       campaign.prizeList,
+      PRIZE_POOL:       formatMoney(campaign.prizePool),
+      UNCLAIMED_DEADLINE: String(answers.UNCLAIMED_DEADLINE ?? '[deadline]'),
+      UNCLAIMED_REDRAW:   String(answers.UNCLAIMED_REDRAW   ?? '[redraw date]'),
+    }
+  }, [campaign, answers])
+
+  // Resolve a clause text — replace {{AUTO}} and [[GAP]] tokens
+  // Memoized to ensure it uses latest AUTO_VARS and answers
+  // Must be called before any conditional returns (Rules of Hooks)
+  const resolveText = useMemo(() => {
+    return (text: string): { resolved: string; hasUnfilledGaps: boolean } => {
+      if (!text) return { resolved: '', hasUnfilledGaps: false }
+      
+      let out = String(text) // Ensure it's a string
+      let hasUnfilledGaps = false
+
+      // Replace auto vars first - {{VAR_NAME}}
+      out = out.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+        const value = AUTO_VARS[key]
+        // Always replace, even if value is empty or placeholder
+        if (value !== undefined && value !== null) {
+          return String(value)
+        }
+        // If key doesn't exist, show placeholder
+        console.warn(`AUTO_VARS missing key: ${key}`, { availableKeys: Object.keys(AUTO_VARS) })
+        return `[${key}]`
+      })
+
+      // Replace gap keys with their answers - [[GAP_KEY]]
+      out = out.replace(/\[\[(\w+)\]\]/g, (match, key) => {
+        const answer = answers[key]
+        if (answer !== undefined && answer !== null && String(answer).trim() !== '') {
+          return String(answer)
+        }
+        hasUnfilledGaps = true
+        return `▓▓▓`
+      })
+
+      // Debug first replacement
+      if (typeof window !== 'undefined' && text.includes('{{PROMOTER_NAME}}')) {
+        console.log('ResolveText debug:', {
+          original: text,
+          afterAutoVars: out,
+          final: out,
+          autoVarsCheck: {
+            PROMOTER_NAME: AUTO_VARS.PROMOTER_NAME,
+            PROMO_START: AUTO_VARS.PROMO_START,
+          }
+        })
+      }
+
+      return { resolved: out, hasUnfilledGaps }
+    }
+  }, [AUTO_VARS, answers])
+
+  // Initialize modal state: show modal only if there are questions to answer
+  useEffect(() => {
+    if (!loading && campaign) {
+      if (totalQuestions > 0) {
+        setShowModal(true)
+      } else {
+        // No questions, skip directly to document
+        setShowDocument(true)
+      }
+    }
+  }, [loading, campaign, totalQuestions])
+
+  if (loading) return (
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+      <div className="text-white/30 text-sm">Loading...</div>
+    </div>
+  )
+  if (!campaign) return (
+    <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+      <div className="text-white/30 text-sm">Campaign not found</div>
+    </div>
+  )
+
+  // Check which follow-ups are needed
+  function followUpNeeded(gap: any): boolean {
+    if (!gap.followUp) return false
+    const parentAnswer = answers[gap.key]
+    return parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen
+  }
+
+  const currentQuestion = allQuestions[currentQuestionIndex]
+  const isLastQuestion = currentQuestionIndex === totalQuestions - 1
+
+  // Check if current question is answered
+  const currentAnswer = currentQuestion ? answers[currentQuestion.gap.key] : undefined
+  // For multiple choice, any selection is valid. For text input, need non-empty string
+  const canProceed = currentQuestion 
+    ? (isFullGap(currentQuestion.gap) && currentQuestion.gap.options
+        ? currentAnswer !== undefined 
+        : currentAnswer !== undefined && String(currentAnswer).trim() !== '')
+    : false
+
+  function handleNext() {
+    if (isLastQuestion) {
+      // Generate terms - close modal and show document
+      setShowModal(false)
+      setShowDocument(true)
+    } else {
+      // Questions are automatically recalculated via useMemo when answers change
+      const nextIndex = currentQuestionIndex + 1
+      
+      // If next index is beyond current questions, we've completed
+      if (nextIndex >= allQuestions.length) {
+        setShowModal(false)
+        setShowDocument(true)
+      } else {
+        setCurrentQuestionIndex(nextIndex)
+      }
+    }
+  }
+
+  function handleBack() {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1)
+    }
+  }
+  async function saveAndShare() {
+    if (!campaign) return
+    setSharing(true)
+    const content = currentClauses.map((clause: Clause) => {
+      const { resolved } = resolveText(clause.text)
+      return `${clause.label}\n\n${resolved}`
+    }).join('\n\n---\n\n')
+    
+    // Debug logging before fetch
+    console.log('Save & Share - Request data:', {
+      campaignId: campaign.id,
+      contentLength: content.length,
+      templateId: templateMeta.id,
+      gapAnswersCount: Object.keys(answers).length,
+    })
+    
+    try {
+      const res = await fetch('/api/terms', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaign.id,
+          content,
+          gapAnswers: answers,
+          templateId: templateMeta.id,
+        }),
+      })
+      
+      setSharing(false)
+      
+      if (!res.ok) {
+        // Error logging
+        const errorText = await res.text()
+        console.error('Save & Share - Error response:', {
+          status: res.status,
+          statusText: res.statusText,
+          errorBody: errorText,
+        })
+        alert(`Failed to save: ${res.status} ${res.statusText}. Check console for details.`)
+        return
+      }
+      
+      const draft = await res.json()
+      const link = `${window.location.origin}/review/${draft.shareToken}`
+      setShareLink(link)
+      console.log('Save & Share - Success:', { draftId: draft.id, shareToken: draft.shareToken })
+    } catch (error: any) {
+      setSharing(false)
+      console.error('Save & Share - Fetch error:', error)
+      alert(`Failed to save: ${error.message}`)
+    }
+  }
+  function handleEditAnswers() {
+    setShowModal(true)
+    setCurrentQuestionIndex(0)
+  }
+
+  // Get user name (placeholder for now)
+  const userName = 'Admin User'
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0f]">
+      <div className="fixed inset-0 opacity-[0.02] pointer-events-none"
+        style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
+
+      {/* Nav */}
+      <nav className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+        <div className="flex items-center gap-4">
+          <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+          <span className="text-white/20">/</span>
+          <Link href={`/dashboard/${id}`} className="text-white/40 hover:text-white text-sm transition-colors">{campaign.name}</Link>
+          <span className="text-white/20">/</span>
+          <span className="text-white text-sm font-semibold">Terms Wizard</span>
+        </div>
+        
+        
+        {showDocument && (
+  <div className="flex items-center gap-4">
+    {shareLink && (
+      <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-4 py-2">
+        <span className="text-white/60 text-xs font-mono truncate max-w-48">{shareLink}</span>
+        <button onClick={() => { navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+          className="text-white font-bold text-xs whitespace-nowrap">
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
+      </div>
+    )}
+   
+  </div>
+)}
+      <button
+  disabled={sharing}
+  onClick={saveAndShare}
+  className="bg-emerald-500 text-white font-black text-sm px-5 py-2 rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50">
+  {sharing ? 'Saving...' : 'Save & Share →'}
+</button>
+<button
+  onClick={() => window.print()}
+  className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2 rounded-xl hover:bg-white/90 transition-all">
+  PDF →
+</button>
+        
+      </nav>
+
+      {/* Modal Wizard */}
+      {showModal && totalQuestions > 0 && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#0a0a0f] border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
+            {/* Close button */}
+            <button
+              onClick={() => {
+                setShowModal(false)
+                if (totalQuestions > 0 && Object.keys(answers).length > 0) {
+                  // If user has answered some questions, show document
+                  setShowDocument(true)
+                }
+              }}
+              className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors z-10"
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {/* Header */}
+            <div className="px-8 py-6 border-b border-white/10">
+              <h2 className="text-white font-black text-2xl mb-1">Let's build your terms, {userName}.</h2>
+              <div className="flex items-center gap-3 mt-3">
+                <select 
+                  value={selectedTemplate}
+                  onChange={(e) => {
+                    setSelectedTemplate(e.target.value)
+                    setCurrentQuestionIndex(0)
+                    setAnswers({})
+                  }}
+                  className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm hover:bg-white/10 focus:outline-none focus:border-white/30 transition-colors"
+                >
+                  <option value="repco-trade">Based on: {REPCO_META.name}</option>
+                  <option value="napa-trade">Based on: {NAPA_META.name}</option>
+                </select>
+                <span className="text-white/30 text-xs">
+                  ({Object.keys(TEMPLATES).length} template{Object.keys(TEMPLATES).length !== 1 ? 's' : ''} available)
+                </span>
+              </div>
+            </div>
+
+            {/* Question */}
+            {currentQuestion && (
+              <div className="px-8 py-8">
+                {/* Progress */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white/40 text-xs font-semibold uppercase tracking-widest">
+                      Question {currentQuestionIndex + 1} of {totalQuestions}
+                    </span>
+                    <div className="flex-1 mx-4 h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-white transition-all duration-300"
+                        style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Question Label */}
+                <h3 className="text-white font-bold text-lg mb-6">{currentQuestion.gap.question}</h3>
+
+                {/* Answer Input */}
+                <div className="space-y-4">
+                  {isFullGap(currentQuestion.gap) && currentQuestion.gap.options && currentQuestion.gap.options.length > 0 ? (
+                    // Multiple choice buttons
+                    <div className="flex flex-col gap-3">
+                      {(() => {
+                        const gap = currentQuestion.gap as Gap
+                        return gap.options!.map((opt: string, i: number) => {
+                          const label = (gap.optionLabels?.[i] ?? opt) || String(i)
+                          const isSelected = String(currentAnswer) === String(i)
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => answer(gap.key, i)}
+                              className={`px-6 py-4 rounded-xl text-left border-2 transition-all ${
+                                isSelected
+                                  ? 'bg-white text-[#0a0a0f] border-white font-bold'
+                                  : 'bg-white/5 border-white/10 text-white/60 hover:border-white/20 hover:text-white'
+                              }`}>
+                              {label}
+                            </button>
+                          )
+                        })
+                      })()}
+                    </div>
+                  ) : (
+                    // Text input
+                    <div>
+                      {currentQuestion.gap.multiline ? (
+                        <textarea
+                          value={String(currentAnswer ?? '')}
+                          onChange={e => answer(currentQuestion.gap.key, e.target.value)}
+                          placeholder={currentQuestion.gap.placeholder ?? 'Type your answer...'}
+                          rows={4}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30 resize-none"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={String(currentAnswer ?? '')}
+                          onChange={e => answer(currentQuestion.gap.key, e.target.value)}
+                          placeholder={currentQuestion.gap.placeholder ?? 'Type your answer...'}
+                          className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                        />
+                      )}
+                    </div>
+                  )}
+
+                </div>
+
+                {/* Navigation */}
+                <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
+                  <button
+                    onClick={handleBack}
+                    disabled={currentQuestionIndex === 0}
+                    className={`px-6 py-3 rounded-xl font-semibold transition-all ${
+                      currentQuestionIndex === 0
+                        ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                        : 'bg-white/10 text-white hover:bg-white/20'
+                    }`}>
+                    ← Back
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    disabled={!canProceed}
+                    className={`px-6 py-3 rounded-xl font-black transition-all ${
+                      canProceed
+                        ? 'bg-white text-[#0a0a0f] hover:bg-white/90'
+                        : 'bg-white/10 text-white/20 cursor-not-allowed'
+                    }`}>
+                    {isLastQuestion ? 'Generate Terms →' : 'Next →'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Document - only shown after wizard completes */}
+      {showDocument && campaign && (
+        <main className="max-w-4xl mx-auto px-6 py-10">
+          <div className="mb-6">
+            <p className="text-white/30 text-xs font-semibold uppercase tracking-widest mb-1">{templateMeta.name}</p>
+            <h1 className="text-white font-black text-3xl mb-1">{campaign.name}</h1>
+          </div>
+
+          {/* Document */}
+          <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
+            {/* Doc title */}
+            <div className="px-8 py-6 border-b border-gray-100">
+              <h2 className="text-gray-900 font-black text-xl">{campaign.name}</h2>
+              <p className="text-gray-400 text-sm mt-0.5">Terms & Conditions · {templateMeta.name}</p>
+            </div>
+
+            {/* Column headers */}
+            <div className="grid grid-cols-[220px_1fr] bg-gray-50 border-b border-gray-200">
+              <div className="px-8 py-3 text-xs font-bold uppercase tracking-widest text-gray-400">Item</div>
+              <div className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-400 border-l border-gray-100">Details</div>
+            </div>
+
+            {/* Clauses */}
+            {currentClauses.length > 0 ? (
+              currentClauses.map((clause, ci) => {
+                const { resolved, hasUnfilledGaps } = resolveText(clause.text)
+                
+                // Debug: Log first clause to see what's happening
+                if (ci === 0 && typeof window !== 'undefined') {
+                  console.log('First clause:', {
+                    original: clause.text,
+                    resolved,
+                    hasUnfilledGaps,
+                    resolvedLength: resolved?.length,
+                    autoVarsSample: {
+                      PROMOTER_NAME: AUTO_VARS.PROMOTER_NAME,
+                      PROMO_START: AUTO_VARS.PROMO_START,
+                      CAMPAIGN_URL: AUTO_VARS.CAMPAIGN_URL,
+                    },
+                    answersKeys: Object.keys(answers),
+                  })
+                }
+
+                return (
+                  <div key={clause.slug} className={`grid grid-cols-[220px_1fr] border-b border-gray-100 last:border-0 ${ci % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                    {/* Label */}
+                    <div className="px-8 py-4 flex items-start gap-2">
+                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${clause.gaps ? 'bg-amber-400' : 'bg-gray-300'}`} />
+                      <span className="text-gray-800 font-semibold text-sm leading-snug">{clause.label}</span>
+                    </div>
+
+                    {/* Content */}
+                    <div className="px-6 py-4 border-l border-gray-100">
+                      <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
+                        {(() => {
+                          // Always show something - even if resolved is empty, show the original or a message
+                          const textToShow = resolved && resolved.trim() ? resolved : (clause.text || 'No content')
+                          
+                          if (clause.gaps) {
+                            if (hasUnfilledGaps) {
+                              return <span className="text-gray-400 italic text-xs">Answer above to generate this clause</span>
+                            }
+                            // Show resolved text directly first to debug, then use AnimatedText
+                            return textToShow ? (
+                              <div>
+                                <AnimatedText text={textToShow} />
+                              </div>
+                            ) : (
+                              <span className="text-red-500 text-xs">ERROR: No text to show</span>
+                            )
+                          }
+                          
+                          // For clauses without gaps, always show resolved text
+                          return textToShow ? (
+                            <div>
+                              <AnimatedText text={textToShow} />
+                            </div>
+                          ) : (
+                            <span className="text-red-500 text-xs">ERROR: No text to show</span>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })
+            ) : (
+              <div className="px-8 py-8 text-center text-gray-400">
+                <p>No clauses found in template.</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+              <p className="text-gray-300 text-xs">Generated by Turnstyle · Flow Marketing · 11 Lomandra Pl, Coolum Beach QLD 4573</p>
+              <p className="text-gray-300 text-xs font-mono">{campaign.tsCode}</p>
+            </div>
+          </div>
+
+          {/* Edit Answers Button */}
+          <div className="mt-6 flex justify-center pb-16">
+            <button
+              onClick={handleEditAnswers}
+              className="px-6 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-all border border-white/10">
+              ← Edit answers
+            </button>
+          </div>
+        </main>
+      )}
+    </div>
+  )
+}

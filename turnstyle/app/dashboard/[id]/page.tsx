@@ -793,6 +793,12 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
         View Abbreviated T&Cs →
       </button>
     </div>
+
+    <button onClick={() => window.open(`/dashboard/${id}/terms-wizard`, '_blank')}
+  className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+  Start Terms Wizard →
+</button>
+
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
       <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Full Terms & Conditions</h2>
       <p className="text-white/40 text-sm mb-4">Unlocks after quote approval. Full compliance wizard with permit applications, draw administration and legal sign-off.</p>
