@@ -75,6 +75,12 @@ model Campaign {
   notes          String?
   status         CampaignStatus @default(DRAFT)
   version        Int            @default(1)
+  permitNSW      String?        @map("permit_nsw")
+  permitSA       String?        @map("permit_sa")
+  permitACT     String?        @map("permit_act")
+  permitLOASigned Boolean       @default(false) @map("permit_loa_signed")
+  drawDatasetUploadedAt DateTime? @map("draw_dataset_uploaded_at")
+  winnersConfirmedAt    DateTime? @map("winners_confirmed_at")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
 
@@ -83,7 +89,6 @@ model Campaign {
   quotes        Quote[]
   summaries     Summary[]
   documents     GeneratedDocument[]
-  auditLogs     AuditLog[]
   termsDrafts   TermsDraft[]
 
   @@map("campaigns")
@@ -126,7 +131,8 @@ enum DrawFrequency {
 
 enum CampaignStatus {
   DRAFT
-  CONFIRMATION
+  CONFIRMED
+  COMPILED
   REVIEW
   PENDING
   SCHEDULED
@@ -293,12 +299,10 @@ model AuditLog {
   createdAt    DateTime @default(now()) @map("created_at")
 
   actor User @relation(fields: [actorId], references: [id])
-  
-  @@map("audit_logs")
 
   @@index([entityType, entityId])
   @@index([actorId])
-  @@map("audit_log")
+  @@map("audit_logs")
 }
 
 model TermsDraft {
@@ -310,6 +314,7 @@ model TermsDraft {
   templateId  String   @map("template_id")
   status      TermsDraftStatus @default(DRAFT)
   shareToken  String   @unique @map("share_token")
+  sharedAt    DateTime? @map("shared_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

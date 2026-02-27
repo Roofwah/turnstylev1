@@ -40,7 +40,7 @@ export async function updateCampaign(id: string, data: {
     const approvedQuotes = await prisma.quote.findMany({
       where: {
         campaignId: id,
-        status: QuoteStatus.APPROVED,
+        status: QuoteStatus.ACCEPTED,
       },
     })
     
@@ -59,7 +59,7 @@ export async function updateCampaign(id: string, data: {
       await prisma.quote.updateMany({
         where: {
           campaignId: id,
-          status: QuoteStatus.APPROVED,
+          status: QuoteStatus.ACCEPTED,
         },
         data: {
           status: QuoteStatus.DRAFT,
@@ -68,13 +68,13 @@ export async function updateCampaign(id: string, data: {
         },
       })
       
-      // Also check if campaign status is APPROVED and revert it to DRAFT
+      // Also check if campaign status is CONFIRMED and revert it to DRAFT
       const campaign = await prisma.campaign.findUnique({
         where: { id },
         select: { status: true },
       })
       
-      if (campaign?.status === CampaignStatus.APPROVED) {
+      if (campaign?.status === CampaignStatus.CONFIRMED) {
         // Campaign status will be updated below with revertToDraft flag
         // But we'll ensure it happens even if revertToDraft wasn't explicitly set
         data.revertToDraft = true

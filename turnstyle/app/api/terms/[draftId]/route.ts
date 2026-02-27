@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(_req: NextRequest, { params }: { params: { draftId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ draftId: string }> }) {
   try {
-    const draft = await prisma.termsDraft.findUnique({
-      where:   { id: params.draftId },
+    const { draftId } = await params
+    const termsDraft = (prisma as any).termsDraft
+    const draft = await termsDraft.findUnique({
+      where:   { id: draftId },
       include: {
         comments:  { orderBy: { createdAt: 'asc' } },
         approvals: true,
@@ -18,11 +20,13 @@ export async function GET(_req: NextRequest, { params }: { params: { draftId: st
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { draftId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ draftId: string }> }) {
   try {
+    const { draftId } = await params
     const body = await req.json()
-    const draft = await prisma.termsDraft.update({
-      where: { id: params.draftId },
+    const termsDraft = (prisma as any).termsDraft
+    const draft = await termsDraft.update({
+      where: { id: draftId },
       data:  { status: body.status },
     })
     return NextResponse.json(draft)

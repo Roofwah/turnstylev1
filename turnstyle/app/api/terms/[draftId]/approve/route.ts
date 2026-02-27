@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export async function POST(req: NextRequest, { params }: { params: { draftId: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ draftId: string }> }) {
   try {
+    const { draftId } = await params
     const body = await req.json()
     const { approverName, approverEmail, status, note } = body
 
@@ -10,18 +11,19 @@ export async function POST(req: NextRequest, { params }: { params: { draftId: st
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const existing = await prisma.termsApproval.findFirst({
-      where: { termsDraftId: params.draftId, approverEmail },
+    const termsApproval = (prisma as any).termsApproval
+    const existing = await termsApproval.findFirst({
+      where: { termsDraftId: draftId, approverEmail },
     })
 
     const approval = existing
-      ? await prisma.termsApproval.update({
+      ? await termsApproval.update({
           where: { id: existing.id },
           data:  { status, note: note || null, respondedAt: new Date() },
         })
-      : await prisma.termsApproval.create({
+      : await termsApproval.create({
           data: {
-            termsDraftId:  params.draftId,
+            termsDraftId:  draftId,
             approverName,
             approverEmail,
             status,
@@ -30,21 +32,23 @@ export async function POST(req: NextRequest, { params }: { params: { draftId: st
           },
         })
 
-    const allApprovals = await prisma.termsApproval.findMany({
-      where: { termsDraftId: params.draftId },
+    const allApprovals = await termsApproval.findMany({
+      where: { termsDraftId: draftId },
     })
 
-    const allApproved = allApprovals.length > 0 && allApprovals.every(a => a.status === 'APPROVED')
+    const allApproved = allApprovals.length > 0 && allApprovals.every((a: any) => a.status === 'APPROVED')
 
     if (allApproved) {
-      await prisma.termsDraft.update({
-        where: { id: params.draftId },
+      const termsDraft = (prisma as any).termsDraft
+      await termsDraft.update({
+        where: { id: draftId },
         data:  { status: 'APPROVED' },
       })
     }
 
     return NextResponse.json(approval)
   } catch (e: any) {
+    console.error('POST /api/terms/[draftId]/approve error:', e)
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }

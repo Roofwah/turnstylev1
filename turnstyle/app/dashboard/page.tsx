@@ -1,12 +1,21 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import CampaignCard from '@/components/CampaignCard'
 
 const statusConfig: Record<string, { label: string; color: string; bg: string }> = {
-  DRAFT:      { label: 'Draft',      color: 'text-white/50',    bg: 'bg-white/5' },
+  DRAFT:     { label: 'Draft',      color: 'text-white/50',    bg: 'bg-white/5' },
+  CONFIRMED: { label: 'Confirmed',  color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  COMPILED:  { label: 'Compiled',   color: 'text-blue-400',    bg: 'bg-blue-400/10' },
+  REVIEW:    { label: 'In Review',  color: 'text-amber-400',   bg: 'bg-amber-400/10' },
+  PENDING:   { label: 'Pending',    color: 'text-orange-400',  bg: 'bg-orange-400/10' },
+  SCHEDULED: { label: 'Scheduled',  color: 'text-purple-400',  bg: 'bg-purple-400/10' },
+  LIVE:      { label: 'Live',       color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+  CLOSED:    { label: 'Closed',     color: 'text-white/50',    bg: 'bg-white/5' },
+  DRAWN:     { label: 'Drawn',      color: 'text-white/60',    bg: 'bg-white/5' },
+  ARCHIVED:  { label: 'Archived',   color: 'text-white/30',    bg: 'bg-white/5' },
+  // Legacy fallbacks
   QUOTE_SENT: { label: 'Quote Sent', color: 'text-amber-400',   bg: 'bg-amber-400/10' },
   APPROVED:   { label: 'Approved',   color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
-  ACTIVE:     { label: 'Active',     color: 'text-blue-400',    bg: 'bg-blue-400/10' },
-  ARCHIVED:   { label: 'Archived',   color: 'text-white/30',    bg: 'bg-white/5' },
 }
 
 function formatMoney(n: number) {
@@ -26,29 +35,22 @@ function daysUntil(d: Date | null, nowMs: number): number | null {
 }
 
 export default async function DashboardPage() {
-  let campaigns
-  try {
-    campaigns = await prisma.campaign.findMany({
-      include: {
-        promoter: true,
-        quotes: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
+  const campaigns = await prisma.campaign.findMany({
+    include: {
+      promoter: true,
+      quotes: {
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+      termsDrafts: {
+        orderBy: { version: 'desc' },
+        include: {
+          approvals: true,
         },
       },
-      orderBy: { createdAt: 'desc' },
-    })
-  } catch (error) {
-    console.error('Error fetching campaigns:', error)
-    return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-400 text-sm mb-4">Error loading campaigns</p>
-          <p className="text-white/40 text-xs">{error instanceof Error ? error.message : 'Unknown error'}</p>
-        </div>
-      </div>
-    )
-  }
+    },
+    orderBy: { createdAt: 'desc' },
+  })
 
   const now = new Date()
   const nowMs = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
@@ -109,137 +111,103 @@ export default async function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            
             {campaigns.map(campaign => {
-  const latestQuote = campaign.quotes?.[0]
-  // Check if quote is approved - if so, campaign should show as APPROVED
-  const hasApprovedQuote = latestQuote?.status === 'APPROVED'
-  const effectiveStatus = hasApprovedQuote ? 'APPROVED' : campaign.status
-  const status = statusConfig[effectiveStatus] ?? statusConfig.DRAFT
-  const AU_STATES = ['NSW','VIC','QLD','SA','WA','ACT','TAS','NT']
-  const r = campaign.regions
-  const regionParts: string[] = []
-  if (r.includes('national_au')) regionParts.push('Aust')
-  else { const s = r.filter((x: string) => AU_STATES.includes(x)); if (s.length) regionParts.push('Aust: ' + s.join(', ')) }
-  if (r.includes('NZ'))  regionParts.push('NZ')
-  if (r.includes('USA')) regionParts.push('USA')
-  if (r.includes('EU'))  regionParts.push('EU')
-  const regionLabel = regionParts.join(' · ') || '—'
+              const latestQuote = campaign.quotes[0]
+              const hasApprovedQuote = latestQuote?.status === 'APPROVED' || latestQuote?.status === 'ACCEPTED'
+              const statusMap: Record<string, string> = {
+                APPROVED: 'CONFIRMED',
+                QUOTE_SENT: 'DRAFT',
+                ACTIVE: 'LIVE',
+              }
+              const effectiveStatus = statusMap[campaign.status] ?? campaign.status
 
-  // Countdown
-  const startDays = daysUntil(campaign.promoStart, nowMs)
-  const endDays   = daysUntil(campaign.promoEnd, nowMs)
-  let countdownLabel: string | null = null
-  if (['DRAFT','QUOTE_SENT','APPROVED','CONFIRMATION','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
-    
-    
-    if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
-else if (startDays === 0)                countdownLabel = 'Starts today'
-} else if (['ACTIVE','LIVE'].includes(campaign.status)) {
-if (endDays !== null && endDays > 0) countdownLabel = `${endDays} days to end`
-else if (endDays === 0)              countdownLabel = 'Ends today'
-  } else if (campaign.status === 'ARCHIVED') {
-    countdownLabel = 'Awaiting draw'
-  }
+              const status = statusConfig[effectiveStatus] ?? statusConfig.DRAFT
 
-  // Permit badge — ACT > $3,500 · SA > $5,000 · NSW > $10,000
-  const prize = Number(campaign.prizePoolTotal)
-  const permitStates: string[] = []
-  if ((r.includes('national_au') || r.includes('ACT')) && prize > 3500)  permitStates.push('ACT')
-  if ((r.includes('national_au') || r.includes('SA'))  && prize > 5000)  permitStates.push('SA')
-  if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
+              const AU_STATES = ['NSW','VIC','QLD','SA','WA','ACT','TAS','NT']
+              const r = campaign.regions
+              const regionParts: string[] = []
+              if (r.includes('national_au')) regionParts.push('Aust')
+              else {
+                const s = r.filter((x: string) => AU_STATES.includes(x))
+                if (s.length) regionParts.push('Aust: ' + s.join(', '))
+              }
+              if (r.includes('NZ'))  regionParts.push('NZ')
+              if (r.includes('USA')) regionParts.push('USA')
+              if (r.includes('EU'))  regionParts.push('EU')
+              const regionLabel = regionParts.join(' · ') || '—'
 
-  const ctas: Record<string, { label: string; color: string }> = {
-    DRAFT:        { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
-    CONFIRMATION: { label: 'View & Confirm Quote →',  color: 'text-amber-400' },
-    APPROVED:     { label: 'Quote Approved ✓',        color: 'text-emerald-400' },
-    QUOTE_SENT:   { label: 'Quote Sent',              color: 'text-amber-400' },
-    ACTIVE:       { label: 'Active',                  color: 'text-blue-400' },
-    ARCHIVED:     { label: 'Archived',                color: 'text-white/20' },
-    // Note: REVIEW, PENDING, SCHEDULED, LIVE, CLOSED, DRAWN will be available after migration
-  }
-  // Use effective status (based on quote approval) for CTA
-  const cta = ctas[effectiveStatus]
+              // Countdown
+              const startDays = daysUntil(campaign.promoStart, nowMs)
+              const endDays   = daysUntil(campaign.promoEnd, nowMs)
+              let countdownLabel: string | null = null
+              if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+                if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
+                else if (startDays === 0) countdownLabel = 'Starts today'
+              } else if (campaign.status === 'LIVE') {
+                if (endDays !== null && endDays > 0) countdownLabel = `${endDays} days to end`
+                else if (endDays === 0) countdownLabel = 'Ends today'
+              } else if (campaign.status === 'CLOSED') {
+                countdownLabel = 'Awaiting draw'
+              }
 
-  return (
-    <Link
-      key={campaign.id}
-      href={`/dashboard/${campaign.id}`}
-      className="block bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:bg-white/[0.05] hover:border-white/[0.10] transition-all group"
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <span className="text-white/30 text-xs font-mono font-bold">{campaign.tsCode}</span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${status.color} ${status.bg}`}>
-              {status.label}
-            </span>
-          </div>
-          <h2 className="text-white font-bold text-lg leading-tight mb-0.5 group-hover:text-white transition-colors">
-            {campaign.name}
-          </h2>
-          <p className="text-white/40 text-sm">{campaign.promoter?.name ?? '—'}</p>
-        </div>
-        <div className="text-right shrink-0">
-          {latestQuote ? (
-            <>
-              <div className="text-white font-black text-lg">{formatMoney(Number(latestQuote.totalExGst))}</div>
-              <div className="text-white/30 text-xs">excl GST</div>
-            </>
-          ) : (
-            <div className="text-amber-400 text-xs font-bold">View & Confirm Quote →</div>
-          )}
-        </div>
-      </div>
+              // Permit badges
+              const prize = Number(campaign.prizePoolTotal)
+              const permitStates: string[] = []
+              if ((r.includes('national_au') || r.includes('ACT')) && prize > 3500)  permitStates.push('ACT')
+              if ((r.includes('national_au') || r.includes('SA'))  && prize > 5000)  permitStates.push('SA')
+              if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
 
-      <div className="mt-4 pt-4 border-t border-white/[0.05] flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-6 flex-wrap">
-          <div>
-            <span className="text-white/30 text-xs">Prize pool </span>
-            <span className="text-white/60 text-xs font-semibold">{formatMoney(Number(campaign.prizePoolTotal))}</span>
-          </div>
-          <div>
-            <span className="text-white/30 text-xs">Dates </span>
-            <span className="text-white/60 text-xs font-semibold">
-              {formatDate(campaign.promoStart)} → {formatDate(campaign.promoEnd)}
-            </span>
-          </div>
-          {countdownLabel && (
-            
-            <div className="px-3 py-0.5 rounded-md bg-sky-400/10 border border-sky-400/20">
-            <span className="text-sky-400 text-xs font-bold">{countdownLabel}</span>
-          </div>
-          )}
-          <div>
-            <span className="text-white/30 text-xs">Regions </span>
-            <span className="text-white/60 text-xs font-semibold">{regionLabel}</span>
-          </div>
-          {permitStates.length > 0 && (
-            <div className="flex items-center gap-1">
-              <span className="text-white/30 text-xs">Permits </span>
-              {permitStates.map(state => {
-  const permitColors: Record<string, string> = {
-    ACT: 'bg-blue-500/15 text-blue-400 border-blue-500/20',
-    SA:  'bg-orange-500/15 text-orange-400 border-orange-500/20',
-    NSW: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20',
-  }
-  return (
-    <span key={state} className={`text-xs font-bold px-1.5 py-0.5 rounded border ${permitColors[state] ?? 'bg-purple-500/15 text-purple-400 border-purple-500/20'}`}>
-      {state}
-    </span>
-  )
-})}
-            </div>
-          )}
-        </div>
-        {cta && (
-          <span className={`text-xs font-bold ${cta.color}`}>{cta.label}</span>
-        )}
-      </div>
-    </Link>
-  )
-})}
-           
+              // Serialize Decimal and Date fields for client component
+              const serializedCampaign = {
+                ...campaign,
+                prizePoolTotal: Number(campaign.prizePoolTotal),
+                promoStart: campaign.promoStart?.toISOString() ?? null,
+                promoEnd: campaign.promoEnd?.toISOString() ?? null,
+                createdAt: campaign.createdAt.toISOString(),
+                updatedAt: campaign.updatedAt.toISOString(),
+                quotes: campaign.quotes.map((q: any) => ({
+                  ...q,
+                  termsFee: q.termsFee ? Number(q.termsFee) : null,
+                  mgmtFee: q.mgmtFee ? Number(q.mgmtFee) : null,
+                  permitFee: q.permitFee ? Number(q.permitFee) : null,
+                  drawFee: q.drawFee ? Number(q.drawFee) : null,
+                  totalExGst: q.totalExGst ? Number(q.totalExGst) : null,
+                  gstAmount: q.gstAmount ? Number(q.gstAmount) : null,
+                  totalIncGst: q.totalIncGst ? Number(q.totalIncGst) : null,
+                  createdAt: q.createdAt?.toISOString() ?? null,
+                  updatedAt: q.updatedAt?.toISOString() ?? null,
+                  approvedAt: q.approvedAt?.toISOString() ?? null,
+                })),
+                termsDrafts: campaign.termsDrafts.map((d: any) => ({
+                  ...d,
+                  createdAt: d.createdAt?.toISOString() ?? null,
+                  updatedAt: d.updatedAt?.toISOString() ?? null,
+                  sharedAt: d.sharedAt?.toISOString() ?? null,
+                  approvals: d.approvals.map((a: any) => ({
+                    ...a,
+                    createdAt: a.createdAt?.toISOString() ?? null,
+                    updatedAt: a.updatedAt?.toISOString() ?? null,
+                  })),
+                })),
+              }
+
+              return (
+                <CampaignCard
+                  key={campaign.id}
+                  campaign={serializedCampaign}
+                  status={status}
+                  effectiveStatus={effectiveStatus}
+                  hasApprovedQuote={hasApprovedQuote}
+                  countdownLabel={countdownLabel}
+                  regionLabel={regionLabel}
+                  permitStates={permitStates}
+                  cta={undefined}
+                  prizePoolTotalFormatted={formatMoney(Number(campaign.prizePoolTotal))}
+                  promoStartFormatted={formatDate(campaign.promoStart)}
+                  promoEndFormatted={formatDate(campaign.promoEnd)}
+                />
+              )
+            })}
           </div>
         )}
       </main>

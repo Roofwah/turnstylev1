@@ -65,6 +65,7 @@ model Campaign {
   documents      GeneratedDocument[]
   quotes         Quote[]
   summaries      Summary[]
+  termsDrafts    TermsDraft[]
 
   @@map("campaigns")
 }
@@ -189,6 +190,53 @@ model AuditLog {
   @@map("audit_log")
 }
 
+model TermsDraft {
+  id         String           @id @default(uuid())
+  campaignId String           @map("campaign_id")
+  version    Int              @default(1)
+  content    String
+  gapAnswers Json
+  templateId String           @map("template_id")
+  status     TermsDraftStatus @default(DRAFT)
+  shareToken String           @unique @map("share_token")
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+  shared_at  DateTime?        @db.Timestamp(6)
+  approvals  TermsApproval[]
+  comments   TermsComment[]
+  campaign   Campaign         @relation(fields: [campaignId], references: [id])
+
+  @@map("terms_drafts")
+}
+
+model TermsComment {
+  id           String        @id @default(uuid())
+  termsDraftId String        @map("terms_draft_id")
+  clauseSlug   String        @map("clause_slug")
+  authorName   String        @map("author_name")
+  authorEmail  String        @map("author_email")
+  body         String
+  status       CommentStatus @default(OPEN)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  draft        TermsDraft    @relation(fields: [termsDraftId], references: [id])
+
+  @@map("terms_comments")
+}
+
+model TermsApproval {
+  id            String         @id @default(uuid())
+  termsDraftId  String         @map("terms_draft_id")
+  approverName  String         @map("approver_name")
+  approverEmail String         @map("approver_email")
+  status        ApprovalStatus @default(PENDING)
+  note          String?
+  respondedAt   DateTime?      @map("responded_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  draft         TermsDraft     @relation(fields: [termsDraftId], references: [id])
+
+  @@map("terms_approvals")
+}
+
 enum UserRole {
   ADMIN
   CLIENT
@@ -216,6 +264,14 @@ enum CampaignStatus {
   QUOTE_SENT
   APPROVED
   ARCHIVED
+  CONFIRMED
+  COMPILED
+  REVIEW
+  PENDING
+  SCHEDULED
+  LIVE
+  CLOSED
+  DRAWN
 }
 
 enum QuoteStatus {
@@ -235,4 +291,22 @@ enum DocumentType {
   ABBREV_TERMS
   FULL_TERMS
   QR_CODE
+}
+
+enum TermsDraftStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  LOCKED
+}
+
+enum CommentStatus {
+  OPEN
+  RESOLVED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

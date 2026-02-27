@@ -187,13 +187,14 @@ export default function TermsWizardPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [showDocument, setShowDocument] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
+  const [draftVersion, setDraftVersion] = useState<number | null>(null)
 
   function answer(key: string, value: string | number) {
     setAnswers(prev => ({ ...prev, [key]: value }))
   }
 
   useEffect(() => {
-    getCampaign(id).then(raw => {
+    getCampaign(id).then(async raw => {
       if (raw) {
         const c = normaliseCampaign(raw)
         setCampaign(c)
@@ -203,6 +204,29 @@ export default function TermsWizardPage() {
           UNCLAIMED_DEADLINE: uc.deadline,
           UNCLAIMED_REDRAW:   uc.redraw,
         })
+
+        // Fetch latest terms draft to restore saved answers
+        try {
+          const res = await fetch(`/api/terms?campaignId=${id}`)
+          const drafts = await res.json()
+          if (Array.isArray(drafts) && drafts.length > 0) {
+            const latest = drafts[0] // already ordered by version desc
+            const savedAnswers = latest.gapAnswers as Record<string, string | number>
+            setAnswers(prev => ({ ...prev, ...savedAnswers }))
+            setShareLink(`${window.location.origin}/review/${latest.shareToken}`)
+            setDraftVersion(latest.version)
+            
+            // Skip modal if saved draft exists - go straight to document
+            setShowDocument(true)
+            setShowModal(false)
+          } else {
+            // No draft exists - modal will be shown by the useEffect that checks totalQuestions
+            // (which runs after this, so we don't need to set it here)
+          }
+        } catch (error) {
+          console.error('Failed to fetch terms drafts:', error)
+          // If fetch fails, modal will be shown by the useEffect that checks totalQuestions
+        }
       }
       setLoading(false)
     })
@@ -355,9 +379,9 @@ export default function TermsWizardPage() {
     }
   }, [AUTO_VARS, answers])
 
-  // Initialize modal state: show modal only if there are questions to answer
+  // Initialize modal state: show modal only if there are questions to answer and no saved draft
   useEffect(() => {
-    if (!loading && campaign) {
+    if (!loading && campaign && !draftVersion) {
       if (totalQuestions > 0) {
         setShowModal(true)
       } else {
@@ -365,7 +389,7 @@ export default function TermsWizardPage() {
         setShowDocument(true)
       }
     }
-  }, [loading, campaign, totalQuestions])
+  }, [loading, campaign, totalQuestions, draftVersion])
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
@@ -423,6 +447,7 @@ export default function TermsWizardPage() {
   }
   async function saveAndShare() {
     if (!campaign) return
+    console.log('💾 CLIENT: Save button clicked, campaign status:', campaign.status)
     setSharing(true)
     const content = currentClauses.map((clause: Clause) => {
       const { resolved } = resolveText(clause.text)
@@ -430,14 +455,16 @@ export default function TermsWizardPage() {
     }).join('\n\n---\n\n')
     
     // Debug logging before fetch
-    console.log('Save & Share - Request data:', {
+    console.log('💾 CLIENT: Save & Share - Request data:', {
       campaignId: campaign.id,
+      campaignStatus: campaign.status,
       contentLength: content.length,
       templateId: templateMeta.id,
       gapAnswersCount: Object.keys(answers).length,
     })
     
     try {
+      console.log('💾 CLIENT: Calling POST /api/terms...')
       const res = await fetch('/api/terms', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -449,12 +476,13 @@ export default function TermsWizardPage() {
         }),
       })
       
+      console.log('💾 CLIENT: Response received:', { status: res.status, ok: res.ok })
       setSharing(false)
       
       if (!res.ok) {
         // Error logging
         const errorText = await res.text()
-        console.error('Save & Share - Error response:', {
+        console.error('❌ CLIENT: Save & Share - Error response:', {
           status: res.status,
           statusText: res.statusText,
           errorBody: errorText,
@@ -464,12 +492,29 @@ export default function TermsWizardPage() {
       }
       
       const draft = await res.json()
+      console.log('✅ CLIENT: Save & Share - Success:', { 
+        draftId: draft.id, 
+        shareToken: draft.shareToken, 
+        version: draft.version,
+        campaignStatus: draft.campaignStatus,
+      })
       const link = `${window.location.origin}/review/${draft.shareToken}`
       setShareLink(link)
-      console.log('Save & Share - Success:', { draftId: draft.id, shareToken: draft.shareToken })
+      setDraftVersion(draft.version)
+      
+      // Refresh campaign data to get updated status
+      if (campaign.id) {
+        console.log('🔄 CLIENT: Refreshing campaign data...')
+        const campaignRes = await fetch(`/api/campaigns/${campaign.id}`)
+        if (campaignRes.ok) {
+          const updatedCampaign = await campaignRes.json()
+          console.log('✅ CLIENT: Campaign refreshed, new status:', updatedCampaign.status)
+          setCampaign(updatedCampaign)
+        }
+      }
     } catch (error: any) {
       setSharing(false)
-      console.error('Save & Share - Fetch error:', error)
+      console.error('❌ CLIENT: Save & Share - Fetch error:', error)
       alert(`Failed to save: ${error.message}`)
     }
   }
@@ -487,42 +532,69 @@ export default function TermsWizardPage() {
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
 
       {/* Nav */}
-      <nav className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
-        <div className="flex items-center gap-4">
-          <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
-          <span className="text-white/20">/</span>
-          <Link href={`/dashboard/${id}`} className="text-white/40 hover:text-white text-sm transition-colors">{campaign.name}</Link>
-          <span className="text-white/20">/</span>
-          <span className="text-white text-sm font-semibold">Terms Wizard</span>
+      <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+            <span className="text-white/20">/</span>
+            <Link href={`/dashboard/${id}`} className="text-white/40 hover:text-white text-sm transition-colors">{campaign.name}</Link>
+            {draftVersion && (
+              <>
+                <span className="text-white/20">/</span>
+                <span className="text-white/60 text-sm">Draft v{draftVersion}</span>
+              </>
+            )}
+            <span className="text-white/20">/</span>
+            <span className="text-white text-sm font-semibold">Terms Wizard</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            {showDocument && (
+              <button
+                className="flex items-center justify-center bg-amber-500/20 border border-amber-500/40 text-amber-400 p-2 rounded-lg hover:bg-amber-500/30 transition-all"
+                title="AI Assistant"
+              >
+                <img
+                  src="/ai.svg"
+                  alt="AI"
+                  className="w-4 h-4"
+                />
+              </button>
+            )}
+            {showDocument && shareLink && (
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(shareLink)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                className="flex items-center justify-center bg-white/10 border border-white/20 text-white p-2 rounded-lg hover:bg-white/20 transition-all"
+                title={shareLink}
+              >
+                {copied ? (
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                )}
+              </button>
+            )}
+            <button
+              disabled={sharing}
+              onClick={saveAndShare}
+              className="bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50">
+              {sharing ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="bg-white text-[#0a0a0f] font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-white/90 transition-all">
+              PDF
+            </button>
+          </div>
         </div>
-        
-        
-        {showDocument && (
-  <div className="flex items-center gap-4">
-    {shareLink && (
-      <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-xl px-4 py-2">
-        <span className="text-white/60 text-xs font-mono truncate max-w-48">{shareLink}</span>
-        <button onClick={() => { navigator.clipboard.writeText(shareLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-          className="text-white font-bold text-xs whitespace-nowrap">
-          {copied ? '✓ Copied' : 'Copy'}
-        </button>
-      </div>
-    )}
-   
-  </div>
-)}
-      <button
-  disabled={sharing}
-  onClick={saveAndShare}
-  className="bg-emerald-500 text-white font-black text-sm px-5 py-2 rounded-xl hover:bg-emerald-400 transition-all disabled:opacity-50">
-  {sharing ? 'Saving...' : 'Save & Share →'}
-</button>
-<button
-  onClick={() => window.print()}
-  className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2 rounded-xl hover:bg-white/90 transition-all">
-  PDF →
-</button>
-        
       </nav>
 
       {/* Modal Wizard */}

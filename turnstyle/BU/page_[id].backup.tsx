@@ -8,6 +8,171 @@ import { getCampaign } from '@/app/actions/getCampaign'
 import { updateCampaign } from '@/app/actions/updateCampaign'
 import { deleteCampaign } from '@/app/actions/deleteCampaign'
 import { confirmQuote } from '@/app/actions/confirmQuote'
+import CampaignLifecycleBar from '@/components/CampaignLifecycleBar'
+
+// Terms Tab Component - Shows drafts and comments
+function TermsTab({ campaignId, campaignStatus }: { campaignId: string; campaignStatus: string }) {
+  const [drafts, setDrafts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch(`/api/terms?campaignId=${campaignId}`)
+      .then(res => res.json())
+      .then(data => {
+        setDrafts(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('Failed to load terms drafts:', err)
+        setLoading(false)
+      })
+  }, [campaignId])
+
+  if (loading) {
+    return <div className="text-white/60 text-sm">Loading terms drafts...</div>
+  }
+
+  const totalOpenComments =
+    drafts.reduce(
+      (sum, d) => sum + (d.comments?.filter((c: any) => c.status === 'OPEN').length || 0),
+      0,
+    )
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Abbreviated Terms & Conditions</h2>
+        <button className="text-amber-400 hover:text-amber-300 text-sm underline"
+          onClick={() => window.open(`/dashboard/${campaignId}/abbrev-terms`, '_blank')}
+        >
+          View Abbreviated Terms →
+        </button>
+      </div>
+      <div>
+        {['CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(campaignStatus) ? (
+          <button onClick={() => window.open(`/dashboard/${campaignId}/terms-wizard`, '_blank')}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded text-sm font-medium">
+            {campaignStatus === 'COMPILED' || campaignStatus === 'REVIEW' ? 'Edit Terms →' : 'Start Terms Wizard →'}
+          </button>
+        ) : (
+          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded text-white/30 text-sm">
+            Approve quote first to unlock terms
+          </div>
+        )}
+        {totalOpenComments > 0 && (
+          <div className="mt-3">
+            <Link
+              href={`/dashboard/${campaignId}/terms/comments`}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-400/40 bg-amber-500/10 text-amber-300 text-xs font-semibold hover:bg-amber-500/20 transition-all"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              {totalOpenComments} comment{totalOpenComments === 1 ? '' : 's'} to resolve
+            </Link>
+          </div>
+        )}
+      </div>
+      <div>
+        <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-4 opacity-60">Full Terms & Conditions</h2>
+        
+        {drafts.length === 0 ? (
+          <p className="text-white/40 text-sm">No terms drafts yet. Create one using the Terms Wizard above.</p>
+        ) : (
+          <div className="space-y-4">
+            {drafts.map((draft) => {
+              const commentCount = draft.comments?.filter((c: any) => c.status === 'OPEN').length || 0
+              const reviewUrl = `${window.location.origin}/review/${draft.shareToken}`
+              
+              return (
+                <div key={draft.id} className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="text-white font-semibold">Version {draft.version}</h3>
+                      <p className="text-white/60 text-xs mt-1">
+                        Created: {new Date(draft.createdAt).toLocaleDateString()}
+                        {' • '}
+                        Status: <span className="capitalize">{draft.status.toLowerCase().replace('_', ' ')}</span>
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {commentCount > 0 && (
+                        <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded text-xs font-medium">
+                          {commentCount} {commentCount === 1 ? 'Comment' : 'Comments'}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => window.open(reviewUrl, '_blank')}
+                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded text-xs border border-amber-500/30"
+                      >
+                        View & Review
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Approvals */}
+                  {draft.approvals && draft.approvals.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <h4 className="text-white/80 text-xs font-semibold mb-2">Approvals:</h4>
+                      <div className="space-y-2">
+                        {draft.approvals
+                          .filter((a: any) => a.status === 'APPROVED')
+                          .map((approval: any) => (
+                            <div key={approval.id} className="text-white/80 text-xs">
+                              <p>
+                                <span className="font-medium">{approval.approverName}</span>
+                                {' · '}
+                                <span className="text-white/60">{approval.approverEmail}</span>
+                                {' · '}
+                                <span className="text-emerald-400">Approved</span>
+                                {' · '}
+                                <span className="text-white/50">
+                                  {new Date(approval.respondedAt || approval.createdAt).toLocaleString('en-AU', {
+                                    day: 'numeric',
+                                    month: 'short',
+                                    year: 'numeric',
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                    hour12: true
+                                  })}
+                                </span>
+                              </p>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Comments */}
+                  {commentCount > 0 && (
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <h4 className="text-white/80 text-xs font-semibold mb-2">Recent Comments:</h4>
+                      <div className="space-y-2">
+                        {draft.comments
+                          ?.filter((c: any) => c.status === 'OPEN')
+                          .slice(0, 3)
+                          .map((comment: any) => (
+                            <div key={comment.id} className="bg-white/5 rounded p-2">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-white/80 text-xs font-medium">{comment.authorName}</span>
+                                <span className="text-white/40 text-xs">{comment.clauseSlug}</span>
+                              </div>
+                              <p className="text-white/60 text-xs line-clamp-2">{comment.body}</p>
+                            </div>
+                          ))}
+                        {commentCount > 3 && (
+                          <p className="text-white/40 text-xs">+ {commentCount - 3} more comments</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -96,9 +261,10 @@ function formatRegions(regions: string[]) {
 }
 
 function normaliseCampaign(raw: any): Campaign {
-  // Check if any quotes are approved - if so, effective status should be APPROVED
-  const hasApprovedQuote = raw.quotes?.some((q: any) => q.status === 'APPROVED')
-  const effectiveStatus = hasApprovedQuote ? 'APPROVED' : (raw.status ?? 'DRAFT')
+  // Use ACTUAL campaign status - if quote is approved, status should be CONFIRMED (set by confirmQuote)
+  // If status is DRAFT, quote is NOT approved - no fake status
+  const hasApprovedQuote = raw.quotes?.some((q: any) => q.status === 'APPROVED' || q.status === 'ACCEPTED')
+  const effectiveStatus = raw.status ?? 'DRAFT' // Use actual status, not fake
   
   return {
     id:            raw.id,
@@ -342,15 +508,17 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
 
       {/* Nav */}
-      <nav className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
-  <div className="flex items-center gap-4">
-    <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
-    <span className="text-white/20">/</span>
-    <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">Campaigns</Link>
-    <span className="text-white/20">/</span>
-    <span className="text-white text-sm font-semibold truncate max-w-xs">{campaign.name}</span>
-  </div>
-</nav>
+      <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+            <span className="text-white/20">/</span>
+            <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">Campaigns</Link>
+            <span className="text-white/20">/</span>
+            <span className="text-white text-sm font-semibold truncate max-w-xs">{campaign.name}</span>
+          </div>
+        </div>
+      </nav>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
 
@@ -367,7 +535,7 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
 
         {/* Header */}
         <div className="flex items-start justify-between gap-6 mb-8 flex-wrap">
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <span className="text-white/30 text-sm font-mono font-bold">{campaign.tsCode}</span>
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${status.color} ${status.bg} ${status.border}`}>
@@ -397,16 +565,14 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
               </>
             ) : (
               <>
-                
                 <button onClick={startEditing}
-  className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all">
-  ✏ Edit Campaign
-</button>
-<button onClick={() => setShowDeleteConfirm(true)}
-  className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-red-500/20 transition-all">
-  Delete
-</button>
-                
+                  className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all">
+                  ✏ Edit Campaign
+                </button>
+                <button onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold px-4 py-2 rounded-xl hover:bg-red-500/20 transition-all">
+                  Delete
+                </button>
               </>
             )}
           </div>
@@ -482,23 +648,18 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
         )}
         {permitStates.length === 0 && (
           <span className="text-white/20 text-xs">No permits required</span>
-        )}  <div className="ml-auto">
+        )}
+        <div className="ml-auto">
         {(() => {
-          const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
-          const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
+          const isConfirmedOrBeyond = ['CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED','LIVE','CLOSED','DRAWN','ARCHIVED'].includes(campaign.status)
           
-          return isApproved ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
-              <span className="text-emerald-400 text-sm">✓</span>
-              <span className="text-emerald-400 text-xs font-bold">Quote Confirmed</span>
-            </div>
-          ) : (
+          return !isConfirmedOrBeyond ? (
             <button
               onClick={async () => {
                 try {
                   const result = await confirmQuote(id)
                   setConfirmedAt(result.confirmedAt)
-                  setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
+                  setCampaign(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
                 } catch (error) {
                   alert(error instanceof Error ? error.message : 'Failed to confirm quote')
                 }
@@ -506,7 +667,7 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
               className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-1.5 rounded-md hover:bg-white/90 transition-all">
               Confirm & Proceed →
             </button>
-          )
+          ) : null
         })()}
       </div>
       </div>
@@ -693,6 +854,18 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
               )}
             </div>
 
+            {/* Lifecycle Bar */}
+            <div className="mt-6 pt-6 border-t border-white/[0.05]">
+              <CampaignLifecycleBar
+                campaignId={id}
+                currentStatus={campaign.status}
+                campaign={campaign}
+                onStatusUpdated={(newStatus) => {
+                  setCampaign(prev => prev ? { ...prev, status: newStatus } : prev)
+                }}
+              />
+            </div>
+
           </div>
         )}
 
@@ -728,39 +901,38 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
               </div>
             </div>
             <div className="flex gap-3">
-            {(() => {
-              const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
-              const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
-              const approvedQuote = campaign.quotes?.find(q => q.status === 'APPROVED')
-              
-              return isApproved ? (
-                <div className="flex-1 bg-emerald-400/10 border border-emerald-400/20 rounded-xl py-3 px-4 flex items-center gap-2">
-                  <span className="text-emerald-400 text-lg">✓</span>
-                  <div>
-                    <div className="text-emerald-400 font-black text-sm">Quote Confirmed</div>
-                    {(confirmedAt || approvedQuote?.approvedAt) && (
-                      <div className="text-emerald-400/60 text-xs">
-                        {new Date(confirmedAt || approvedQuote?.approvedAt || '').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={async () => {
-                    try {
-                      const result = await confirmQuote(id)
-                      setConfirmedAt(result.confirmedAt)
-                      setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
-                    } catch (error) {
-                      alert(error instanceof Error ? error.message : 'Failed to confirm quote')
-                    }
+            <div className="flex flex-col gap-2 w-full">
+              {/* Lifecycle Bar */}
+              <div className="mb-4 pt-4 border-t border-white/[0.05]">
+                <CampaignLifecycleBar
+                  campaignId={id}
+                  currentStatus={campaign.status}
+                  campaign={campaign}
+                  onStatusUpdated={(newStatus) => {
+                    setCampaign(prev => prev ? { ...prev, status: newStatus } : prev)
                   }}
-                  className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-3 rounded-xl hover:bg-white/90 transition-all">
-                  Confirm & Proceed →
-                </button>
-              )
-            })()}
+                />
+              </div>
+              {(() => {
+                const isConfirmedOrBeyond = ['CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED','LIVE','CLOSED','DRAWN','ARCHIVED'].includes(campaign.status)
+                
+                return !isConfirmedOrBeyond ? (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const result = await confirmQuote(id)
+                        setConfirmedAt(result.confirmedAt)
+                        setCampaign(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
+                      } catch (error) {
+                        alert(error instanceof Error ? error.message : 'Failed to confirm quote')
+                      }
+                    }}
+                    className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-3 rounded-xl hover:bg-white/90 transition-all">
+                    Confirm & Proceed →
+                  </button>
+                ) : null
+              })()}
+            </div>
               
               
               
@@ -781,28 +953,10 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
           </div>
         )}
 
-       {/* ── Tab: Terms ── */}
-{activeTab === 'terms' && (
-  <div className="max-w-2xl space-y-4">
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
-      <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Abbreviated Terms & Conditions</h2>
-      <p className="text-white/40 text-sm mb-4">Free — auto-generated from campaign data. Includes QR code linked permanently to this campaign.</p>
-      <button
-        onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
-        className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
-        View Abbreviated T&Cs →
-      </button>
-    </div>
-    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
-      <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Full Terms & Conditions</h2>
-      <p className="text-white/40 text-sm mb-4">Unlocks after quote approval. Full compliance wizard with permit applications, draw administration and legal sign-off.</p>
-      <button onClick={() => setActiveTab('quote')}
-        className="bg-white/[0.06] border border-white/10 text-white/40 text-sm font-semibold px-6 py-2.5 rounded-xl cursor-not-allowed">
-        🔒 Approve Quote to Unlock
-      </button>
-    </div>
-  </div>
-)}
+        {/* ── Tab: Terms ── */}
+        {activeTab === 'terms' && (
+          <TermsTab campaignId={id} campaignStatus={campaign.status} />
+        )}
 
         {/* ── History ── */}
         {activeTab === 'history' && (

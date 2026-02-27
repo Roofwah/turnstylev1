@@ -131,16 +131,18 @@ export default function AbbrevTermsPage() {
       `}</style>
 
       {/* Toolbar */}
-      <div className="no-print" style={{ background: '#0a0a0f', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
-        <a href={`/dashboard/${id}`} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textDecoration: 'none' }}>← Back to Campaign</a>
-        <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>|</span>
-        <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Abbreviated Terms & Conditions</span>
-        <button
-          onClick={() => window.print()}
-          style={{ marginLeft: 'auto', background: 'white', color: '#0a0a0f', border: 'none', borderRadius: 10, padding: '8px 20px', fontWeight: 900, fontSize: 13, cursor: 'pointer' }}
-        >
-          Print / Save as PDF
-        </button>
+      <div className="no-print" style={{ background: '#0a0a0f' }}>
+        <div style={{ maxWidth: '1536px', margin: '0 auto', padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <a href={`/dashboard/${id}`} style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, textDecoration: 'none' }}>← Back to Campaign</a>
+          <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: 13 }}>|</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Abbreviated Terms & Conditions</span>
+          <button
+            onClick={() => window.print()}
+            style={{ marginLeft: 'auto', background: 'white', color: '#0a0a0f', border: 'none', borderRadius: 10, padding: '8px 20px', fontWeight: 900, fontSize: 13, cursor: 'pointer' }}
+          >
+            Print / Save as PDF
+          </button>
+        </div>
       </div>
 
       {/* Document */}
