@@ -6,6 +6,7 @@ import { getCampaign } from '@/app/actions/getCampaign'
 import Link from 'next/link'
 import { REPCO_TRADE, TEMPLATE_META as REPCO_META } from '@/lib/terms-templates/repco-trade'
 import { NAPA_TRADE, TEMPLATE_META as NAPA_META } from '@/lib/terms-templates/napa-trade'
+import { useNotify } from '@/components/useNotify'
 
 // Template registry
 type TemplateData = {
@@ -58,8 +59,6 @@ interface Question {
   isFollowUp: boolean
   parentGap?: Gap
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatMoney(n: number) {
   return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2 })
@@ -117,49 +116,22 @@ function normaliseCampaign(raw: any) {
   }
 }
 
-// ─── Animated text ────────────────────────────────────────────────────────────
-
 function AnimatedText({ text }: { text: string }) {
   const [shown, setShown] = useState('')
   const [done, setDone]   = useState(false)
   const prev = useRef('')
 
   useEffect(() => {
-    // If text hasn't changed, don't re-run
-    if (text === prev.current) {
-      return
-    }
-    
+    if (text === prev.current) return
     prev.current = text
     setDone(false)
-    
-    if (!text) { 
-      setShown('')
-      return 
-    }
-    
-    // Show text immediately
+    if (!text) { setShown(''); return }
     setShown(text)
     setDone(true)
-    
-    // Optional: Uncomment below for word-by-word animation (18ms per word)
-    // setShown('')
-    // setDone(false)
-    // const words = text.split(' ')
-    // let i = 0
-    // const t = setInterval(() => {
-    //   i++
-    //   setShown(words.slice(0, i).join(' '))
-    //   if (i >= words.length) { clearInterval(t); setDone(true) }
-    // }, 18)
-    // return () => clearInterval(t)
   }, [text])
 
   if (!text) return <span className="text-gray-300 italic">Waiting for answer...</span>
-  
-  // Always show the text, even if animation hasn't started
   const displayText = shown || text
-  
   return (
     <span>
       {displayText}
@@ -168,21 +140,16 @@ function AnimatedText({ text }: { text: string }) {
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
-
 export default function TermsWizardPage() {
   const params = useParams()
   const id = params.id as string
+  const { toast, modal } = useNotify()
   const [campaign, setCampaign] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
-
-  // All gap answers keyed by gap key
   const [answers, setAnswers] = useState<Record<string, string | number>>({})
   const [sharing, setSharing]     = useState(false)
   const [shareLink, setShareLink] = useState('')
   const [copied, setCopied]       = useState(false)
-  
-  // Modal wizard state
   const [showModal, setShowModal] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [showDocument, setShowDocument] = useState(false)
@@ -198,63 +165,45 @@ export default function TermsWizardPage() {
       if (raw) {
         const c = normaliseCampaign(raw)
         setCampaign(c)
-        // Pre-fill calculated values
         const uc = calcUnclaimed(c.promoEnd)
         setAnswers({
           UNCLAIMED_DEADLINE: uc.deadline,
           UNCLAIMED_REDRAW:   uc.redraw,
         })
-
-        // Fetch latest terms draft to restore saved answers
         try {
           const res = await fetch(`/api/terms?campaignId=${id}`)
           const drafts = await res.json()
           if (Array.isArray(drafts) && drafts.length > 0) {
-            const latest = drafts[0] // already ordered by version desc
+            const latest = drafts[0]
             const savedAnswers = latest.gapAnswers as Record<string, string | number>
             setAnswers(prev => ({ ...prev, ...savedAnswers }))
             setShareLink(`${window.location.origin}/review/${latest.shareToken}`)
             setDraftVersion(latest.version)
-            
-            // Skip modal if saved draft exists - go straight to document
             setShowDocument(true)
             setShowModal(false)
-          } else {
-            // No draft exists - modal will be shown by the useEffect that checks totalQuestions
-            // (which runs after this, so we don't need to set it here)
           }
         } catch (error) {
           console.error('Failed to fetch terms drafts:', error)
-          // If fetch fails, modal will be shown by the useEffect that checks totalQuestions
         }
       }
       setLoading(false)
     })
   }, [id])
 
-  // Type guard to check if gap is a full Gap (not just followUp)
   function isFullGap(gap: QuestionGap): gap is Gap {
     return 'options' in gap || 'optionLabels' in gap || 'followUp' in gap
   }
 
-  // Get current template
   const currentTemplate = TEMPLATES[selectedTemplate] || TEMPLATES['repco-trade']
   const currentClauses = currentTemplate.clauses
   const templateMeta = currentTemplate.meta
 
-  // Extract all gaps from all clauses into a flat array of questions
-  // Memoized to recalculate when answers or template change
   const allQuestions: Question[] = useMemo(() => {
     const questions: Question[] = []
-    
     currentClauses.forEach((clause: Clause) => {
       if (!clause.gaps) return
-      
       clause.gaps.forEach((gap: Gap) => {
-        // Add main gap question
         questions.push({ gap, isFollowUp: false })
-        
-        // Add follow-up question only if parent answer matches showWhen
         if (gap.followUp) {
           const parentAnswer = answers[gap.key]
           if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
@@ -263,54 +212,32 @@ export default function TermsWizardPage() {
         }
       })
     })
-    
     return questions
   }, [answers, currentClauses])
 
   const totalQuestions = allQuestions.length
 
-  // Format promoter address (can be JSON object or string)
   function formatAddress(address: any): string {
     if (!address) return '[Address]'
     if (typeof address === 'string') return address
     if (typeof address === 'object') {
-      const parts = [
-        address.street,
-        address.suburb,
-        address.state,
-        address.postcode,
-      ].filter(Boolean)
+      const parts = [address.street, address.suburb, address.state, address.postcode].filter(Boolean)
       return parts.join(', ') || '[Address]'
     }
     return '[Address]'
   }
 
-  // Auto variables — memoized to update when answers or campaign changes
-  // Must be called before any conditional returns (Rules of Hooks)
   const AUTO_VARS: Record<string, string> = useMemo(() => {
     if (!campaign) {
       return {
-        PROMOTER_NAME: '[Promoter name]',
-        PROMOTER_ABN: '[ABN]',
-        PROMOTER_ADDRESS: '[Address]',
-        PROMO_START: '[Start date]',
-        PROMO_END: '[End date]',
-        DRAW_MECHANIC: '[Draw mechanic]',
-        CAMPAIGN_URL: '[Campaign URL]',
-        REGION: '[Region]',
-        ENTRY_MECHANIC: '[entry mechanic]',
-        TOTAL_WINNERS: '0',
-        DRAW_DATE: '[Draw date]',
-        PRIZE_LIST: '[Prize list]',
-        PRIZE_POOL: '$0.00',
+        PROMOTER_NAME: '[Promoter name]', PROMOTER_ABN: '[ABN]', PROMOTER_ADDRESS: '[Address]',
+        PROMO_START: '[Start date]', PROMO_END: '[End date]', DRAW_MECHANIC: '[Draw mechanic]',
+        CAMPAIGN_URL: '[Campaign URL]', REGION: '[Region]', ENTRY_MECHANIC: '[entry mechanic]',
+        TOTAL_WINNERS: '0', DRAW_DATE: '[Draw date]', PRIZE_LIST: '[Prize list]', PRIZE_POOL: '$0.00',
         UNCLAIMED_DEADLINE: String(answers.UNCLAIMED_DEADLINE ?? '[deadline]'),
         UNCLAIMED_REDRAW: String(answers.UNCLAIMED_REDRAW ?? '[redraw date]'),
       }
     }
-    
-    const campaignUrl = `https://turnstylehost.com/campaign/${campaign.tsCode.toLowerCase()}/`
-    const drawDate = calcDrawDate(campaign.promoEnd)
-    
     return {
       PROMOTER_NAME:    campaign.promoter?.name    ?? '[Promoter name]',
       PROMOTER_ABN:     campaign.promoter?.abn     ?? '[ABN]',
@@ -318,11 +245,11 @@ export default function TermsWizardPage() {
       PROMO_START:      formatDateLong(campaign.promoStart),
       PROMO_END:        formatDateLong(campaign.promoEnd),
       DRAW_MECHANIC:    campaign.drawMechanic,
-      CAMPAIGN_URL:     campaignUrl,
+      CAMPAIGN_URL:     `https://turnstylehost.com/campaign/${campaign.tsCode.toLowerCase()}/`,
       REGION:           formatRegion(campaign.regions),
       ENTRY_MECHANIC:   campaign.entryMechanic || '[entry mechanic]',
       TOTAL_WINNERS:    String(campaign.totalWinners),
-      DRAW_DATE:        drawDate,
+      DRAW_DATE:        calcDrawDate(campaign.promoEnd),
       PRIZE_LIST:       campaign.prizeList,
       PRIZE_POOL:       formatMoney(campaign.prizePool),
       UNCLAIMED_DEADLINE: String(answers.UNCLAIMED_DEADLINE ?? '[deadline]'),
@@ -330,64 +257,30 @@ export default function TermsWizardPage() {
     }
   }, [campaign, answers])
 
-  // Resolve a clause text — replace {{AUTO}} and [[GAP]] tokens
-  // Memoized to ensure it uses latest AUTO_VARS and answers
-  // Must be called before any conditional returns (Rules of Hooks)
   const resolveText = useMemo(() => {
     return (text: string): { resolved: string; hasUnfilledGaps: boolean } => {
       if (!text) return { resolved: '', hasUnfilledGaps: false }
-      
-      let out = String(text) // Ensure it's a string
+      let out = String(text)
       let hasUnfilledGaps = false
-
-      // Replace auto vars first - {{VAR_NAME}}
       out = out.replace(/\{\{(\w+)\}\}/g, (match, key) => {
         const value = AUTO_VARS[key]
-        // Always replace, even if value is empty or placeholder
-        if (value !== undefined && value !== null) {
-          return String(value)
-        }
-        // If key doesn't exist, show placeholder
-        console.warn(`AUTO_VARS missing key: ${key}`, { availableKeys: Object.keys(AUTO_VARS) })
+        if (value !== undefined && value !== null) return String(value)
         return `[${key}]`
       })
-
-      // Replace gap keys with their answers - [[GAP_KEY]]
       out = out.replace(/\[\[(\w+)\]\]/g, (match, key) => {
         const answer = answers[key]
-        if (answer !== undefined && answer !== null && String(answer).trim() !== '') {
-          return String(answer)
-        }
+        if (answer !== undefined && answer !== null && String(answer).trim() !== '') return String(answer)
         hasUnfilledGaps = true
         return `▓▓▓`
       })
-
-      // Debug first replacement
-      if (typeof window !== 'undefined' && text.includes('{{PROMOTER_NAME}}')) {
-        console.log('ResolveText debug:', {
-          original: text,
-          afterAutoVars: out,
-          final: out,
-          autoVarsCheck: {
-            PROMOTER_NAME: AUTO_VARS.PROMOTER_NAME,
-            PROMO_START: AUTO_VARS.PROMO_START,
-          }
-        })
-      }
-
       return { resolved: out, hasUnfilledGaps }
     }
   }, [AUTO_VARS, answers])
 
-  // Initialize modal state: show modal only if there are questions to answer and no saved draft
   useEffect(() => {
     if (!loading && campaign && !draftVersion) {
-      if (totalQuestions > 0) {
-        setShowModal(true)
-      } else {
-        // No questions, skip directly to document
-        setShowDocument(true)
-      }
+      if (totalQuestions > 0) setShowModal(true)
+      else setShowDocument(true)
     }
   }, [loading, campaign, totalQuestions, draftVersion])
 
@@ -402,35 +295,21 @@ export default function TermsWizardPage() {
     </div>
   )
 
-  // Check which follow-ups are needed
-  function followUpNeeded(gap: any): boolean {
-    if (!gap.followUp) return false
-    const parentAnswer = answers[gap.key]
-    return parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen
-  }
-
   const currentQuestion = allQuestions[currentQuestionIndex]
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1
-
-  // Check if current question is answered
   const currentAnswer = currentQuestion ? answers[currentQuestion.gap.key] : undefined
-  // For multiple choice, any selection is valid. For text input, need non-empty string
-  const canProceed = currentQuestion 
+  const canProceed = currentQuestion
     ? (isFullGap(currentQuestion.gap) && currentQuestion.gap.options
-        ? currentAnswer !== undefined 
+        ? currentAnswer !== undefined
         : currentAnswer !== undefined && String(currentAnswer).trim() !== '')
     : false
 
   function handleNext() {
     if (isLastQuestion) {
-      // Generate terms - close modal and show document
       setShowModal(false)
       setShowDocument(true)
     } else {
-      // Questions are automatically recalculated via useMemo when answers change
       const nextIndex = currentQuestionIndex + 1
-      
-      // If next index is beyond current questions, we've completed
       if (nextIndex >= allQuestions.length) {
         setShowModal(false)
         setShowDocument(true)
@@ -441,30 +320,18 @@ export default function TermsWizardPage() {
   }
 
   function handleBack() {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1)
-    }
+    if (currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1)
   }
+
   async function saveAndShare() {
     if (!campaign) return
-    console.log('💾 CLIENT: Save button clicked, campaign status:', campaign.status)
     setSharing(true)
     const content = currentClauses.map((clause: Clause) => {
       const { resolved } = resolveText(clause.text)
       return `${clause.label}\n\n${resolved}`
     }).join('\n\n---\n\n')
-    
-    // Debug logging before fetch
-    console.log('💾 CLIENT: Save & Share - Request data:', {
-      campaignId: campaign.id,
-      campaignStatus: campaign.status,
-      contentLength: content.length,
-      templateId: templateMeta.id,
-      gapAnswersCount: Object.keys(answers).length,
-    })
-    
+
     try {
-      console.log('💾 CLIENT: Calling POST /api/terms...')
       const res = await fetch('/api/terms', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -475,55 +342,43 @@ export default function TermsWizardPage() {
           templateId: templateMeta.id,
         }),
       })
-      
-      console.log('💾 CLIENT: Response received:', { status: res.status, ok: res.ok })
+
       setSharing(false)
-      
+
       if (!res.ok) {
-        // Error logging
         const errorText = await res.text()
-        console.error('❌ CLIENT: Save & Share - Error response:', {
-          status: res.status,
-          statusText: res.statusText,
-          errorBody: errorText,
-        })
-        alert(`Failed to save: ${res.status} ${res.statusText}. Check console for details.`)
+        console.error('Save error:', errorText)
+        toast(`Failed to save: ${res.status} ${res.statusText}`, 'error')
         return
       }
-      
+
       const draft = await res.json()
-      console.log('✅ CLIENT: Save & Share - Success:', { 
-        draftId: draft.id, 
-        shareToken: draft.shareToken, 
-        version: draft.version,
-        campaignStatus: draft.campaignStatus,
-      })
       const link = `${window.location.origin}/review/${draft.shareToken}`
       setShareLink(link)
       setDraftVersion(draft.version)
-      
-      // Refresh campaign data to get updated status
+
       if (campaign.id) {
-        console.log('🔄 CLIENT: Refreshing campaign data...')
         const campaignRes = await fetch(`/api/campaigns/${campaign.id}`)
         if (campaignRes.ok) {
           const updatedCampaign = await campaignRes.json()
-          console.log('✅ CLIENT: Campaign refreshed, new status:', updatedCampaign.status)
           setCampaign(updatedCampaign)
         }
       }
+
+      toast(`Draft v${draft.version} saved successfully`)
+
     } catch (error: any) {
       setSharing(false)
-      console.error('❌ CLIENT: Save & Share - Fetch error:', error)
-      alert(`Failed to save: ${error.message}`)
+      console.error('Save error:', error)
+      toast(`Failed to save: ${error.message}`, 'error')
     }
   }
+
   function handleEditAnswers() {
     setShowModal(true)
     setCurrentQuestionIndex(0)
   }
 
-  // Get user name (placeholder for now)
   const userName = 'Admin User'
 
   return (
@@ -547,39 +402,31 @@ export default function TermsWizardPage() {
             <span className="text-white/20">/</span>
             <span className="text-white text-sm font-semibold">Terms Wizard</span>
           </div>
-          
+
           <div className="flex items-center gap-2">
             {showDocument && (
               <button
                 className="flex items-center justify-center bg-amber-500/20 border border-amber-500/40 text-amber-400 p-2 rounded-lg hover:bg-amber-500/30 transition-all"
                 title="AI Assistant"
               >
-                <img
-                  src="/ai.svg"
-                  alt="AI"
-                  className="w-4 h-4"
-                />
+                <img src="/ai.svg" alt="AI" className="w-4 h-4" />
               </button>
             )}
             {showDocument && shareLink && (
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(shareLink)
-                  setCopied(true)
-                  setTimeout(() => setCopied(false), 2000)
+                  modal({
+                    title: 'Share Review Link',
+                    message: 'Copy this link and send it to the promoter for review.',
+                    copyText: shareLink,
+                  })
                 }}
                 className="flex items-center justify-center bg-white/10 border border-white/20 text-white p-2 rounded-lg hover:bg-white/20 transition-all"
-                title={shareLink}
+                title="Share link"
               >
-                {copied ? (
-                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                )}
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
               </button>
             )}
             <button
@@ -601,28 +448,22 @@ export default function TermsWizardPage() {
       {showModal && totalQuestions > 0 && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0a0a0f] border border-white/10 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto relative">
-            {/* Close button */}
             <button
               onClick={() => {
                 setShowModal(false)
-                if (totalQuestions > 0 && Object.keys(answers).length > 0) {
-                  // If user has answered some questions, show document
-                  setShowDocument(true)
-                }
+                if (totalQuestions > 0 && Object.keys(answers).length > 0) setShowDocument(true)
               }}
               className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors z-10"
-              aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
 
-            {/* Header */}
             <div className="px-8 py-6 border-b border-white/10">
               <h2 className="text-white font-black text-2xl mb-1">Let's build your terms, {userName}.</h2>
               <div className="flex items-center gap-3 mt-3">
-                <select 
+                <select
                   value={selectedTemplate}
                   onChange={(e) => {
                     setSelectedTemplate(e.target.value)
@@ -640,17 +481,15 @@ export default function TermsWizardPage() {
               </div>
             </div>
 
-            {/* Question */}
             {currentQuestion && (
               <div className="px-8 py-8">
-                {/* Progress */}
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-white/40 text-xs font-semibold uppercase tracking-widest">
                       Question {currentQuestionIndex + 1} of {totalQuestions}
                     </span>
                     <div className="flex-1 mx-4 h-1 bg-white/5 rounded-full overflow-hidden">
-                      <div 
+                      <div
                         className="h-full bg-white transition-all duration-300"
                         style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
                       />
@@ -658,13 +497,10 @@ export default function TermsWizardPage() {
                   </div>
                 </div>
 
-                {/* Question Label */}
                 <h3 className="text-white font-bold text-lg mb-6">{currentQuestion.gap.question}</h3>
 
-                {/* Answer Input */}
                 <div className="space-y-4">
                   {isFullGap(currentQuestion.gap) && currentQuestion.gap.options && currentQuestion.gap.options.length > 0 ? (
-                    // Multiple choice buttons
                     <div className="flex flex-col gap-3">
                       {(() => {
                         const gap = currentQuestion.gap as Gap
@@ -688,7 +524,6 @@ export default function TermsWizardPage() {
                       })()}
                     </div>
                   ) : (
-                    // Text input
                     <div>
                       {currentQuestion.gap.multiline ? (
                         <textarea
@@ -709,10 +544,8 @@ export default function TermsWizardPage() {
                       )}
                     </div>
                   )}
-
                 </div>
 
-                {/* Navigation */}
                 <div className="flex items-center justify-between mt-8 pt-6 border-t border-white/10">
                   <button
                     onClick={handleBack}
@@ -741,7 +574,7 @@ export default function TermsWizardPage() {
         </div>
       )}
 
-      {/* Document - only shown after wizard completes */}
+      {/* Document */}
       {showDocument && campaign && (
         <main className="max-w-4xl mx-auto px-6 py-10">
           <div className="mb-6">
@@ -749,78 +582,34 @@ export default function TermsWizardPage() {
             <h1 className="text-white font-black text-3xl mb-1">{campaign.name}</h1>
           </div>
 
-          {/* Document */}
           <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
-            {/* Doc title */}
             <div className="px-8 py-6 border-b border-gray-100">
               <h2 className="text-gray-900 font-black text-xl">{campaign.name}</h2>
               <p className="text-gray-400 text-sm mt-0.5">Terms & Conditions · {templateMeta.name}</p>
             </div>
 
-            {/* Column headers */}
             <div className="grid grid-cols-[220px_1fr] bg-gray-50 border-b border-gray-200">
               <div className="px-8 py-3 text-xs font-bold uppercase tracking-widest text-gray-400">Item</div>
               <div className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-400 border-l border-gray-100">Details</div>
             </div>
 
-            {/* Clauses */}
             {currentClauses.length > 0 ? (
               currentClauses.map((clause, ci) => {
                 const { resolved, hasUnfilledGaps } = resolveText(clause.text)
-                
-                // Debug: Log first clause to see what's happening
-                if (ci === 0 && typeof window !== 'undefined') {
-                  console.log('First clause:', {
-                    original: clause.text,
-                    resolved,
-                    hasUnfilledGaps,
-                    resolvedLength: resolved?.length,
-                    autoVarsSample: {
-                      PROMOTER_NAME: AUTO_VARS.PROMOTER_NAME,
-                      PROMO_START: AUTO_VARS.PROMO_START,
-                      CAMPAIGN_URL: AUTO_VARS.CAMPAIGN_URL,
-                    },
-                    answersKeys: Object.keys(answers),
-                  })
-                }
-
                 return (
                   <div key={clause.slug} className={`grid grid-cols-[220px_1fr] border-b border-gray-100 last:border-0 ${ci % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
-                    {/* Label */}
                     <div className="px-8 py-4 flex items-start gap-2">
                       <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${clause.gaps ? 'bg-amber-400' : 'bg-gray-300'}`} />
                       <span className="text-gray-800 font-semibold text-sm leading-snug">{clause.label}</span>
                     </div>
-
-                    {/* Content */}
                     <div className="px-6 py-4 border-l border-gray-100">
                       <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
                         {(() => {
-                          // Always show something - even if resolved is empty, show the original or a message
                           const textToShow = resolved && resolved.trim() ? resolved : (clause.text || 'No content')
-                          
-                          if (clause.gaps) {
-                            if (hasUnfilledGaps) {
-                              return <span className="text-gray-400 italic text-xs">Answer above to generate this clause</span>
-                            }
-                            // Show resolved text directly first to debug, then use AnimatedText
-                            return textToShow ? (
-                              <div>
-                                <AnimatedText text={textToShow} />
-                              </div>
-                            ) : (
-                              <span className="text-red-500 text-xs">ERROR: No text to show</span>
-                            )
+                          if (clause.gaps && hasUnfilledGaps) {
+                            return <span className="text-gray-400 italic text-xs">Answer above to generate this clause</span>
                           }
-                          
-                          // For clauses without gaps, always show resolved text
-                          return textToShow ? (
-                            <div>
-                              <AnimatedText text={textToShow} />
-                            </div>
-                          ) : (
-                            <span className="text-red-500 text-xs">ERROR: No text to show</span>
-                          )
+                          return <AnimatedText text={textToShow} />
                         })()}
                       </div>
                     </div>
@@ -833,14 +622,12 @@ export default function TermsWizardPage() {
               </div>
             )}
 
-            {/* Footer */}
             <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
               <p className="text-gray-300 text-xs">Generated by Turnstyle · Flow Marketing · 11 Lomandra Pl, Coolum Beach QLD 4573</p>
               <p className="text-gray-300 text-xs font-mono">{campaign.tsCode}</p>
             </div>
           </div>
 
-          {/* Edit Answers Button */}
           <div className="mt-6 flex justify-center pb-16">
             <button
               onClick={handleEditAnswers}

@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { NextStepConfig } from '@/lib/lifecycle'
 
@@ -42,6 +41,8 @@ interface LifecycleBarProps {
   disabled?: boolean
   isPrerequisiteMet?: boolean
   prerequisiteMessage?: string
+  compact?: boolean
+  hideButton?: boolean
 }
 
 export default function LifecycleBar({
@@ -54,6 +55,8 @@ export default function LifecycleBar({
   disabled = false,
   isPrerequisiteMet = true,
   prerequisiteMessage,
+  compact = false,
+  hideButton = false,
 }: LifecycleBarProps) {
   const router = useRouter()
   const currentIndex = LIFECYCLE_STAGES.indexOf(currentStatus as LifecycleStage)
@@ -108,7 +111,7 @@ export default function LifecycleBar({
               onClick={async (e) => {
                 e.preventDefault(); e.stopPropagation()
                 try { await onApproveQuote() }
-                catch (error) { alert(`Failed: ${error instanceof Error ? error.message : 'Unknown error'}`) }
+                catch (error) { console.error('Approve quote error:', error) }
               }}
               className={buttonClass}
               disabled={disabled}
@@ -147,70 +150,35 @@ export default function LifecycleBar({
     )
   }
 
+  // Compact mode: just the Next Step button
+  if (compact) {
+    return (
+      <div onClick={(e) => e.stopPropagation()}>
+        {renderNextStepButton()}
+      </div>
+    )
+  }
+
   return (
     <div className="flex items-center gap-3 w-full">
-
-      {/* Mobile: just show current node + label */}
+      {/* Mobile node */}
       <div className="flex md:hidden flex-col items-center gap-1.5">
-        <div
-          className="rounded-full"
-          style={{
-            width: '18px', height: '18px',
-            background: currentColor,
-            boxShadow: `0 0 8px ${currentColor}, 0 0 16px ${currentColor}40`,
-            animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-          }}
-        />
-        <div style={{ fontSize: '10px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>
-          {currentStage}
-        </div>
+        <div className="rounded-full" style={{ width: '18px', height: '18px', background: currentColor, boxShadow: `0 0 8px ${currentColor}, 0 0 16px ${currentColor}40`, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
+        <div style={{ fontSize: '10px', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap' }}>{currentStage}</div>
       </div>
 
-      {/* Desktop: full metro map */}
+      {/* Desktop metro map */}
       <div className="hidden md:block flex-1 relative" style={{ height: '52px' }}>
-
-
-
-        {/* Nodes row */}
         <div className="absolute inset-0 flex items-start" style={{ paddingTop: '2px' }}>
           {LIFECYCLE_STAGES.map((stage, index) => {
             const isCompleted = index < validIndex
             const isCurrent = index === validIndex
             const isFuture = index > validIndex
             const color = STAGE_COLORS[stage]
-
             return (
-              <div
-                key={stage}
-                className="flex-1 flex flex-col items-center"
-                style={{ zIndex: 2 }}
-              >
-                {/* Node */}
-                <div
-                  className="rounded-full"
-                  style={{
-                    width: isCurrent ? '18px' : '12px',
-                    height: isCurrent ? '18px' : '12px',
-                    marginTop: isCurrent ? '0px' : '3px',
-                    background: isCompleted || isCurrent ? color : 'transparent',
-                    border: isFuture ? '2px solid rgba(255,255,255,0.15)' : 'none',
-                    boxShadow: isCurrent ? `0 0 8px ${color}, 0 0 16px ${color}40` : 'none',
-                    animation: isCurrent ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none',
-                    transition: 'all 0.3s ease',
-                  }}
-                />
-                {/* Label */}
-                <div
-                  style={{
-                    marginTop: '6px',
-                    fontSize: '9px',
-                    fontWeight: isCurrent ? 700 : 400,
-                    color: isCurrent ? '#fff' : isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)',
-                    whiteSpace: 'nowrap',
-                    letterSpacing: '0.02em',
-                    textAlign: 'center',
-                  }}
-                >
+              <div key={stage} className="flex-1 flex flex-col items-center" style={{ zIndex: 2 }}>
+                <div className="rounded-full" style={{ width: isCurrent ? '18px' : '12px', height: isCurrent ? '18px' : '12px', marginTop: isCurrent ? '0px' : '3px', background: isCompleted || isCurrent ? color : 'transparent', border: isFuture ? '2px solid rgba(255,255,255,0.15)' : 'none', boxShadow: isCurrent ? `0 0 8px ${color}, 0 0 16px ${color}40` : 'none', animation: isCurrent ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : 'none', transition: 'all 0.3s ease' }} />
+                <div style={{ marginTop: '6px', fontSize: '9px', fontWeight: isCurrent ? 700 : 400, color: isCurrent ? '#fff' : isCompleted ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)', whiteSpace: 'nowrap', letterSpacing: '0.02em', textAlign: 'center' }}>
                   {stage}
                 </div>
               </div>
@@ -219,11 +187,12 @@ export default function LifecycleBar({
         </div>
       </div>
 
-      {/* Next Step button */}
-      <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-        {renderNextStepButton()}
-      </div>
-
+      {/* Next Step button — hidden when card header already shows it */}
+      {!hideButton && (
+        <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {renderNextStepButton()}
+        </div>
+      )}
     </div>
   )
 }
