@@ -51,7 +51,7 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
         }
         
         return {
-          confirmedAt: approvedQuotes[0].approvedAt?.toISOString() || new Date().toISOString(),
+          confirmedAt: new Date().toISOString(),
           quotesApproved: approvedQuotes.length,
           message: `Quote(s) already approved.`,
           alreadyApproved: true,
