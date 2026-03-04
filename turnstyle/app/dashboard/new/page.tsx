@@ -345,6 +345,20 @@ export default function BuildFormPage() {
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
               <div><Label>Campaign Name *</Label><Input value={form.campaignName} onChange={handleCampaignNameChange} placeholder="e.g. Summer Promo 2026" required /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Promotion Start *</Label>
+                  <input type="date" value={form.promoStart} min={new Date().toISOString().split('T')[0]}
+                    onChange={e => { set('promoStart', e.target.value); if (form.promoEnd && e.target.value > form.promoEnd) set('promoEnd', '') }}
+                    required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
+                </div>
+                <div>
+                  <Label>Promotion End *</Label>
+                  <input type="date" value={form.promoEnd} min={form.promoStart || new Date().toISOString().split('T')[0]}
+                    onChange={e => set('promoEnd', e.target.value)}
+                    required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
+                </div>
+              </div>
               <div><Label>Notes</Label><Textarea value={form.notes} onChange={v => set('notes', v)} placeholder="Any special requirements..." /></div>
             </div>
           </div>
