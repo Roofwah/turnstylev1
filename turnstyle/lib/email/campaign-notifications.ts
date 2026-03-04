@@ -31,7 +31,7 @@ function formatMoney(n: number) {
   return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2 })
 }
 
-function threadHeaders(threadMessageId: string | null | undefined) {
+function threadHeaders(threadMessageId: string | null | undefined): Record<string, string> | undefined {
   if (!threadMessageId) return {}
   return {
     'In-Reply-To': threadMessageId,
