@@ -1102,7 +1102,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
             <p className="text-white/40 text-sm mb-6">This will permanently delete <span className="text-white font-semibold">{campaign?.name}</span> and all associated data. This cannot be undone.</p>
             <div className="flex gap-3">
               <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
-              <button onClick={async () => { await deleteCampaign(campaign!.id) }} className="flex-1 bg-red-500 text-white font-black text-sm px-4 py-2.5 rounded-xl hover:bg-red-600 transition-all">Delete Campaign</button>
+              <form action={deleteCampaign.bind(null, campaign!.id)}><button type="submit" className="w-full bg-red-500 text-white font-black text-sm px-4 py-2.5 rounded-xl hover:bg-red-600 transition-all">Delete Campaign</button></form>
             </div>
           </div>
         </div>
