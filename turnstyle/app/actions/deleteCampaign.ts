@@ -25,6 +25,8 @@ export async function deleteCampaign(id: string) {
   // Delete terms drafts
   await prisma.termsDraft.deleteMany({ where: { campaignId: id } })
 
+  // Delete quotes
+  await prisma.quote.deleteMany({ where: { campaignId: id } })
   // Delete other related records
   await prisma.generatedDocument.deleteMany({ where: { campaignId: id } })
   await prisma.auditLog.deleteMany({ where: { entityId: id } })
