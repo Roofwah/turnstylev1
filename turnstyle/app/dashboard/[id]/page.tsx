@@ -940,7 +940,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
       </div>
       <div>
         
-          href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`https://turnstylehost.com/campaign/${campaign.tsCode}`)}&download=1`}
+<a href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`https://turnstylehost.com/campaign/${campaign.tsCode}`)}&download=1`}
           download={`${campaign.tsCode}-qr.png`}
           className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all inline-block">
           Download QR Code →
