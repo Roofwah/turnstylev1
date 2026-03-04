@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { calculateQuote } from '@/lib/quote-engine'
 import { createCampaign } from '@/app/actions/campaigns'
+import { searchPromoters, type PromoterRecord } from '@/lib/promoter-lookup'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,8 @@ export default function BuildFormPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [promoterSuggestions, setPromoterSuggestions] = useState<PromoterRecord[]>([])
+  const [promoterLocked, setPromoterLocked] = useState(false)
 
   const [form, setForm] = useState<FormData>({
     promoterName: '', promoterAbn: '', contactName: '', contactEmail: '', contactPhone: '',
@@ -297,8 +300,32 @@ export default function BuildFormPage() {
               <p className="text-white/40 text-sm">Who is running this promotion?</p>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-              <div><Label>Company / Promoter Name *</Label><Input value={form.promoterName} onChange={v => set('promoterName', v)} placeholder="e.g. Coca-Cola Amatil" required /></div>
-              <div><Label>ABN</Label><Input value={form.promoterAbn} onChange={v => set('promoterAbn', v)} placeholder="e.g. 26 004 139 397" /></div>
+              <div className="relative">
+                <Label>Company / Promoter Name *</Label>
+                <Input value={form.promoterName} onChange={v => {
+                  set('promoterName', v)
+                  setPromoterLocked(false)
+                  setPromoterSuggestions(searchPromoters(v))
+                }} placeholder="e.g. Repco, Woolworths..." required />
+                {promoterSuggestions.length > 0 && !promoterLocked && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/[0.12] rounded-xl overflow-hidden shadow-xl">
+                    {promoterSuggestions.map(p => (
+                      <button key={p.abn} type="button"
+                        onClick={() => {
+                          set('promoterName', p.name)
+                          set('promoterAbn', p.abn)
+                          setPromoterSuggestions([])
+                          setPromoterLocked(true)
+                        }}
+                        className="w-full text-left px-4 py-3 hover:bg-white/[0.06] transition-all border-b border-white/[0.06] last:border-0">
+                        <div className="text-white text-sm font-semibold">{p.name}</div>
+                        <div className="text-white/40 text-xs mt-0.5">ABN {p.abn} · {p.address}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div><Label>ABN {!promoterLocked && <span className="text-amber-400/70 normal-case font-normal">(auto-filled when promoter selected)</span>}</Label><Input value={form.promoterAbn} onChange={v => set('promoterAbn', v)} placeholder="e.g. 26 004 139 397" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Contact Name *</Label><Input value={form.contactName} onChange={v => set('contactName', v)} placeholder="Full name" required /></div>
                 <div><Label>Contact Phone</Label><Input value={form.contactPhone} onChange={v => set('contactPhone', v)} placeholder="+61 2 ..." /></div>
