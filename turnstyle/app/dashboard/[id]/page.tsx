@@ -216,7 +216,7 @@ function CommandCentrePageInner() {
     setDraft(prev => {
       if (!prev) return prev
       const updated = { ...prev, [key]: value }
-      if (campaign?.status === 'APPROVED' && QUOTE_AFFECTING_FIELDS.includes(key)) {
+      if (campaign?.status === 'CONFIRMED' && QUOTE_AFFECTING_FIELDS.includes(key)) {
         setApprovalWarning(true)
       }
       return updated
