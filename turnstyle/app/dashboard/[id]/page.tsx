@@ -435,7 +435,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
   const r = source.regions
   const prize = prizePoolTotal
   const permitStates: string[] = []
-  if ((r.includes('national_au') || r.includes('ACT')) && prize > 3500)  permitStates.push('ACT')
+  if ((r.includes('national_au') || r.includes('ACT')) && prize > 3000)  permitStates.push('ACT')
   if ((r.includes('national_au') || r.includes('SA'))  && prize > 5000)  permitStates.push('SA')
   if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
   const permitColors: Record<string, string> = {
@@ -961,7 +961,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
                 const r = campaign.regions ?? []
                 const prize = prizePoolTotal
                 const permitStates: string[] = []
-                if ((r.includes('national_au') || r.includes('ACT')) && prize > 3500) permitStates.push('ACT')
+                if ((r.includes('national_au') || r.includes('ACT')) && prize > 3000) permitStates.push('ACT')
                 if ((r.includes('national_au') || r.includes('SA')) && prize > 5000) permitStates.push('SA')
                 if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
                 return permitStates.length > 0 ? (
