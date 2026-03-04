@@ -9,7 +9,7 @@ export async function createCampaign(data: {
   promoterAbn: string
   contactName: string
   contactEmail: string
-  contactPhone: string
+  promoterAddress: string
   campaignName: string
   tsCode: string
   promoStart: string
@@ -30,7 +30,7 @@ export async function createCampaign(data: {
       abn: data.promoterAbn || null,
       contactName: data.contactName,
       contactEmail: data.contactEmail,
-      contactPhone: data.contactPhone || null,
+      address: data.promoterAddress || null,
     },
   })
 

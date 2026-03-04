@@ -21,7 +21,7 @@ interface FormData {
   promoterAbn: string
   contactName: string
   contactEmail: string
-  contactPhone: string
+  promoterAddress: string
   campaignName: string
   tsCode: string
   promoStart: string
@@ -149,7 +149,7 @@ export default function BuildFormPage() {
   const [promoterLocked, setPromoterLocked] = useState(false)
 
   const [form, setForm] = useState<FormData>({
-    promoterName: '', promoterAbn: '', contactName: '', contactEmail: '', contactPhone: '',
+    promoterName: '', promoterAbn: '', promoterAddress: '', contactName: '', contactEmail: '',
     campaignName: '', tsCode: '', promoStart: '', promoEnd: '', notes: '',
     drawMechanic: '', drawFrequency: 'at_conclusion', entryMechanic: '',
     regions: [],
@@ -314,6 +314,7 @@ export default function BuildFormPage() {
                         onClick={() => {
                           set('promoterName', p.name)
                           set('promoterAbn', p.abn)
+                          set('promoterAddress', p.address)
                           setPromoterSuggestions([])
                           setPromoterLocked(true)
                         }}
@@ -326,9 +327,9 @@ export default function BuildFormPage() {
                 )}
               </div>
               <div><Label>ABN {!promoterLocked && <span className="text-amber-400/70 normal-case font-normal">(auto-filled when promoter selected)</span>}</Label><Input value={form.promoterAbn} onChange={v => set('promoterAbn', v)} placeholder="e.g. 26 004 139 397" /></div>
+              <div><Label>Address</Label><Input value={form.promoterAddress} onChange={v => set('promoterAddress', v)} placeholder="e.g. 22 Enterprise Drive, Rowville VIC 3178" /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Contact Name *</Label><Input value={form.contactName} onChange={v => set('contactName', v)} placeholder="Full name" required /></div>
-                <div><Label>Contact Phone</Label><Input value={form.contactPhone} onChange={v => set('contactPhone', v)} placeholder="+61 2 ..." /></div>
               </div>
               <div><Label>Contact Email *</Label><Input value={form.contactEmail} onChange={v => set('contactEmail', v)} placeholder="email@company.com" type="email" required /></div>
             </div>
