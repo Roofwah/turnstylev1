@@ -56,7 +56,7 @@ export async function PATCH(
 
     const currentStatus = campaign.status as CampaignStatus
     const { force } = body
-    const userRole = 'CLIENT'
+    const userRole: string = 'CLIENT'
 
     // ── REVIEW → COMPILED rollback ──
     if (newStatus === 'COMPILED' && currentStatus === 'REVIEW') {
