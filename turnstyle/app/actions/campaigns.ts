@@ -98,7 +98,7 @@ await prisma.quote.create({
     totalIncGst:   quote.totalIncGst,
     validUntil:    new Date(quote.validUntil),
     engineVersion: '0.1.5',
-    snapshotJson:  { campaign: data, quote },
+    snapshotJson:  { campaign: data, quote } as any,
   },
 })
 
