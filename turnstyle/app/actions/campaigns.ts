@@ -30,6 +30,7 @@ export async function createCampaign(data: {
       abn: data.promoterAbn ? data.promoterAbn.replace(/\s/g, "") : null,
       contactName: data.contactName,
       contactEmail: data.contactEmail,
+      contactPhone: null,
       address: data.promoterAddress || null,
     },
   })
