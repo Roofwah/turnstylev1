@@ -31,6 +31,7 @@ export async function createCampaign(data: {
       contactName: data.contactName ? String(data.contactName).trim() : null,
       contactEmail: data.contactEmail ? String(data.contactEmail).trim() : null,
       contactPhone: null,
+      address: data.promoterAddress ? String(data.promoterAddress).trim() : null,
     },
   })
 
