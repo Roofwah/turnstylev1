@@ -37,7 +37,7 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
 
     if (draftQuotes.length === 0) {
       // Check if quotes are already approved
-      const approvedQuotes = allQuotes.filter(q => q.status === QuoteStatus.APPROVED)
+      const approvedQuotes = allQuotes.filter(q => q.status === QuoteStatus.ACCEPTED)
       
       if (approvedQuotes.length > 0) {
         // Quotes are already approved - ensure campaign status is also APPROVED
@@ -85,7 +85,7 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
         const updatedQuote = await tx.quote.update({
           where: { id: quote.id },
           data: {
-            status: QuoteStatus.APPROVED,
+            status: QuoteStatus.ACCEPTED,
             approvedAt: now,
             ...(approvedById && { approvedById }),
           },
