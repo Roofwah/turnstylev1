@@ -538,7 +538,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
             { id: 'overview',   label: 'Overview' },
             { id: 'quote',      label: 'Quote' },
             { id: 'terms',      label: 'Terms' },
-            { id: 'abbr-terms', label: 'Abbr Terms' },
+            // { id: 'abbr-terms', label: 'Abbr Terms' },
             { id: 'qr-code',    label: 'QR Code' },
             { id: 'loa',        label: 'LOA' },
             { id: 'draw',       label: 'Draw' },
