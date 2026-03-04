@@ -47,7 +47,7 @@ model Promoter {
   contactName  String?  @map("contact_name")
   contactEmail String?  @map("contact_email")
   contactPhone String?  @map("contact_phone")
-  address      String?
+  address      String?  @map("address")
 users        User[]            @relation("UserPromoter")
 templates    PromoterTemplate[]
   createdAt    DateTime @default(now()) @map("created_at")
