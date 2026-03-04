@@ -115,7 +115,7 @@ export default async function DashboardPage() {
           <div className="space-y-3">
             {campaigns.map(campaign => {
               const latestQuote = campaign.quotes[0]
-              const hasApprovedQuote = latestQuote?.status === 'ACCEPTED' || latestQuote?.status === 'ACCEPTED'
+              const hasApprovedQuote = (latestQuote?.status as string) === 'ACCEPTED'
               const statusMap: Record<string, string> = {
                 APPROVED: 'CONFIRMED',
                 QUOTE_SENT: 'DRAFT',
