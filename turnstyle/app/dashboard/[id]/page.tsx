@@ -1094,6 +1094,19 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
           </div>
         )}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#0a0a0f] border border-white/[0.10] rounded-2xl p-8 max-w-md w-full mx-4">
+            <h2 className="text-white font-black text-xl mb-2">Delete Campaign?</h2>
+            <p className="text-white/40 text-sm mb-6">This will permanently delete <span className="text-white font-semibold">{campaign?.name}</span> and all associated data. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => deleteCampaign(campaign!.id)} className="flex-1 bg-red-500 text-white font-black text-sm px-4 py-2.5 rounded-xl hover:bg-red-600 transition-all">Delete Campaign</button>
+            </div>
+          </div>
+        </div>
+      )}
       </main>
     </div>
   )
