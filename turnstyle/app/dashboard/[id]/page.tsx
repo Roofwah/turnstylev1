@@ -925,20 +925,30 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
           </div>
         )}
 
-        {/* ── QR Code ── */}
-        {activeTab === 'qr-code' && (
-          <div className="max-w-2xl">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
-              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">QR Code</h2>
-              <p className="text-white/40 text-sm mb-6">This QR code links permanently to your campaign page at <span className="text-white/60 font-mono text-xs">turnstylehost.com/campaign/{campaign.tsCode}</span></p>
-              <button
-                onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
-                className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
-                View QR Code →
-              </button>
-            </div>
-          </div>
-        )}
+       {/* ── QR Code ── */}
+{activeTab === 'qr-code' && (
+  <div className="max-w-2xl">
+    <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+      <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">QR Code</h2>
+      <p className="text-white/40 text-sm mb-6">Links to <span className="text-white/60 font-mono text-xs">turnstylehost.com/campaign/{campaign.tsCode}</span></p>
+      <div className="bg-white p-4 rounded-xl inline-block mb-4">
+        <img 
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`https://turnstylehost.com/campaign/${campaign.tsCode}`)}`}
+          alt="Campaign QR Code"
+          style={{ width: 200, height: 200 }}
+        />
+      </div>
+      <div>
+        
+          href={`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(`https://turnstylehost.com/campaign/${campaign.tsCode}`)}&download=1`}
+          download={`${campaign.tsCode}-qr.png`}
+          className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all inline-block">
+          Download QR Code →
+        </a>
+      </div>
+    </div>
+  </div>
+)}
 
         {/* ── LOA ── */}
         {activeTab === 'loa' && (
