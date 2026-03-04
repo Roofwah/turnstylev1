@@ -65,15 +65,15 @@ const PROMOTER_ALIASES: Record<string, string> = {
 
 export const TEMPLATE_REGISTRY: TemplateEntry[] = [
   {
-    meta: { ...REPCO_TRADE_META, mechanic: 'sweepstakes', description: 'Repco Trade — account purchase sweepstakes', isActive: true },
+    meta: { ...REPCO_TRADE_META, mechanic: 'sweepstakes', description: 'Repco Trade — account purchase sweepstakes', isActive: true } as TemplateMeta,
     clauses: REPCO_TRADE as TemplateClause[],
   },
   {
-    meta: { ...REPCO_RETAIL_META, mechanic: 'sweepstakes', description: 'Repco Retail — loyalty card sweepstakes', isActive: true },
+    meta: { ...REPCO_RETAIL_META, mechanic: 'sweepstakes', description: 'Repco Retail — loyalty card sweepstakes', isActive: true } as TemplateMeta,
     clauses: REPCO_RETAIL as TemplateClause[],
   },
   {
-    meta: { ...NAPA_META, mechanic: 'sweepstakes', description: 'NAPA Trade — account purchase sweepstakes', isActive: true },
+    meta: { ...NAPA_META, mechanic: 'sweepstakes', description: 'NAPA Trade — account purchase sweepstakes', isActive: true } as TemplateMeta,
     clauses: NAPA_TRADE as TemplateClause[],
   },
 ]
