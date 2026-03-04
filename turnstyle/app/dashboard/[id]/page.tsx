@@ -104,7 +104,7 @@ function formatRegions(regions: string[]) {
 
 function normaliseCampaign(raw: any): Campaign {
   // Check if any quotes are approved - if so, effective status should be APPROVED
-  const hasApprovedQuote = raw.quotes?.some((q: any) => q.status === 'APPROVED')
+  const hasApprovedQuote = raw.quotes?.some((q: any) => q.status === 'ACCEPTED')
   const effectiveStatus = hasApprovedQuote ? 'APPROVED' : (raw.status ?? 'DRAFT')
   
   return {
@@ -277,7 +277,7 @@ const daysUntilFn = (d: string | null) => {
 const startDays = daysUntilFn(source.promoStart)
 const endDays   = daysUntilFn(source.promoEnd)
 let countdownLabel: string | null = null
-if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
   if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
   else if (startDays === 0) countdownLabel = 'Starts today'
   else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -454,7 +454,7 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
   const startDays = daysUntil(source.promoStart)
   const endDays   = daysUntil(source.promoEnd)
   let countdownLabel: string | null = null
-  if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+  if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
     if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
     else if (startDays === 0) countdownLabel = 'Starts today'
     else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -501,8 +501,8 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
           <span className="text-white/20 text-xs">No permits required</span>
         )}  <div className="ml-auto">
         {(() => {
-          const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
-          const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
+          const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'ACCEPTED')
+          const isApproved = campaign.status === 'CONFIRMED' || hasApprovedQuote
           
           return isApproved ? (
             <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
@@ -758,9 +758,9 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
             </div>
             <div className="flex gap-3">
             {(() => {
-              const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'APPROVED')
-              const isApproved = campaign.status === 'APPROVED' || hasApprovedQuote
-              const approvedQuote = campaign.quotes?.find(q => q.status === 'APPROVED')
+              const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'ACCEPTED')
+              const isApproved = campaign.status === 'CONFIRMED' || hasApprovedQuote
+              const approvedQuote = campaign.quotes?.find(q => q.status === 'ACCEPTED')
               
               return isApproved ? (
                 <div className="flex-1 bg-emerald-400/10 border border-emerald-400/20 rounded-xl py-3 px-4 flex items-center gap-2">

@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       campaignId,
       status: campaign?.status,
       quotes: campaign?.quotes?.map((q: any) => ({ id: q.id, status: q.status, quoteNumber: q.quoteNumber })),
-      hasApprovedQuote: campaign?.quotes?.some((q: any) => q.status === 'APPROVED' || q.status === 'ACCEPTED'),
+      hasApprovedQuote: campaign?.quotes?.some((q: any) => q.status === 'ACCEPTED'),
     })
 
     if (!campaign) {
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     // Never block saving terms for campaigns already past CONFIRMED
     const currentStatus = String(campaign.status)
     
-    if (currentStatus === 'CONFIRMED' || currentStatus === 'APPROVED') {
+    if (currentStatus === 'CONFIRMED' || currentStatus === 'CONFIRMED') {
       try {
         
         

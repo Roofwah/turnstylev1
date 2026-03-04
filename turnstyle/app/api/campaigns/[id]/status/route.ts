@@ -101,7 +101,7 @@ export async function PATCH(
       case 'DRAFT':
         if (newStatus === 'CONFIRMED') {
           const hasApprovedQuote = campaign.quotes.some(q =>
-            q.status === 'APPROVED' || q.status === 'ACCEPTED'
+            q.status === 'ACCEPTED'
           )
           if (!hasApprovedQuote) prerequisiteError = 'Quote must be approved before advancing to CONFIRMED'
         }
