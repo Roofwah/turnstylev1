@@ -36,10 +36,11 @@ interface FormData {
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'TAS', 'NT']
 
 const MECHANIC_OPTIONS = [
-  { value: 'Sweepstakes - Random Draw', label: 'Sweepstakes — Random Draw' },
-  { value: 'Sweepstakes - Instant Win',  label: 'Sweepstakes — Instant Win' },
-  { value: 'Limited Offer',              label: 'Limited Offer' },
-  { value: 'Other',                      label: 'Other / Unsure' },
+  { value: 'Sweepstakes',   label: 'Sweepstakes' },
+  { value: 'Instant Win',   label: 'Instant Win' },
+  { value: 'Limited Offer', label: 'Limited Offer' },
+  { value: 'Game of Skill', label: 'Game of Skill' },
+  { value: 'Other',         label: 'Other' },
 ]
 
 const FREQUENCY_OPTIONS = [
@@ -316,48 +317,6 @@ export default function BuildFormPage() {
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
               <div><Label>Campaign Name *</Label><Input value={form.campaignName} onChange={handleCampaignNameChange} placeholder="e.g. Summer Promo 2026" required /></div>
-              <div>
-                <Label>Campaign Code</Label>
-                <div className="flex gap-2 items-center">
-                  <Input value={form.tsCode} onChange={v => set('tsCode', v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 5))} placeholder="XXXXX" />
-                  <span className="text-white/30 text-xs w-32 shrink-0">Auto-generated · editable</span>
-                </div>
-                {form.tsCode && (
-                  <p className="text-white/30 text-xs mt-1.5">Quote number: <span className="text-white/60 font-mono">TS{new Date().getFullYear().toString().slice(-2)}{form.tsCode}</span></p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-               
-              <div>
-  <Label>Promotion Start *</Label>
-  <input
-    type="date"
-    value={form.promoStart}
-    min={new Date().toISOString().split('T')[0]}
-    onChange={e => {
-      set('promoStart', e.target.value)
-      if (form.promoEnd && e.target.value > form.promoEnd) {
-        set('promoEnd', '')
-      }
-    }}
-    required
-    className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all"
-  />
-</div>
-<div>
-  <Label>Promotion End *</Label>
-  <input
-    type="date"
-    value={form.promoEnd}
-    min={form.promoStart || new Date().toISOString().split('T')[0]}
-    onChange={e => set('promoEnd', e.target.value)}
-    required
-    className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all"
-  />
-</div>
-               
-               
-               </div>
               <div><Label>Notes</Label><Textarea value={form.notes} onChange={v => set('notes', v)} placeholder="Any special requirements..." /></div>
             </div>
           </div>
@@ -371,9 +330,15 @@ export default function BuildFormPage() {
               <p className="text-white/40 text-sm">How will winners be selected?</p>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-              <div><Label>Draw Mechanic *</Label><Select value={form.drawMechanic} onChange={v => set('drawMechanic', v)} options={MECHANIC_OPTIONS} /></div>
+              <div><Label>Promotion Type *</Label><Select value={form.drawMechanic} onChange={v => set('drawMechanic', v)} options={MECHANIC_OPTIONS} /></div>
               <div><Label>Draw Frequency</Label><Select value={form.drawFrequency} onChange={v => set('drawFrequency', v)} options={FREQUENCY_OPTIONS} /></div>
-              <div><Label>Entry Mechanic</Label><Textarea value={form.entryMechanic} onChange={v => set('entryMechanic', v)} placeholder="e.g. Purchase any participating product and scan the QR code to enter..." /></div>
+              <div><Label>Entry Method</Label><Select value={form.entryMechanic} onChange={v => set('entryMechanic', v)} options={[
+  { value: 'Account Based Purchases', label: 'Account Based Purchases' },
+  { value: 'Purchase & Show Loyalty Card', label: 'Purchase & Show Loyalty Card' },
+  { value: 'Online - Purchase Required', label: 'Online - Purchase Required' },
+  { value: 'Online - No Purchase', label: 'Online - No Purchase' },
+  { value: 'Other', label: 'Other' },
+]} /></div>
 
               {/* ── Regions ── */}
               <div>
