@@ -305,7 +305,7 @@ export default function BuildFormPage() {
                 <Input value={form.promoterName} onChange={v => {
                   set('promoterName', v)
                   setPromoterLocked(false)
-                  setPromoterSuggestions(searchPromoters(v))
+                  setPromoterSuggestions(v.length >= 3 ? searchPromoters(v) : [])
                 }} placeholder="e.g. Repco, Woolworths..." required />
                 {promoterSuggestions.length > 0 && !promoterLocked && (
                   <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-[#1a1a2e] border border-white/[0.12] rounded-xl overflow-hidden shadow-xl">
