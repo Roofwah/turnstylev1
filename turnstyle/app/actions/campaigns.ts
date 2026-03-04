@@ -27,7 +27,7 @@ export async function createCampaign(data: {
   const promoter = await prisma.promoter.create({
     data: {
       name: data.promoterName,
-      abn: data.promoterAbn || null,
+      abn: data.promoterAbn ? data.promoterAbn.replace(/\s/g, "") : null,
       contactName: data.contactName,
       contactEmail: data.contactEmail,
       address: data.promoterAddress || null,
