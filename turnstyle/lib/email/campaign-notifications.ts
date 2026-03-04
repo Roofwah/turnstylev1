@@ -100,7 +100,7 @@ export async function sendDraftEmail(data: CampaignEmailData) {
     bcc: BCC,
     subject: `${data.campaignName} Notification`,
     html,
-    headers: {},
+    headers: threadHeaders(data.threadMessageId),
   })
 
   return result.data?.id || null
