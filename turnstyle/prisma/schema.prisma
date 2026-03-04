@@ -118,6 +118,7 @@ enum MechanicType {
   SWEEPSTAKES
   LIMITED_OFFER
   INSTANT_WIN
+  GAME_OF_SKILL
   OTHER
 }
 

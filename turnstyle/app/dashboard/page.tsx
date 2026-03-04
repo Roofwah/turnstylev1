@@ -202,6 +202,7 @@ export default async function DashboardPage() {
                   effectiveStatus={effectiveStatus}
                   hasApprovedQuote={hasApprovedQuote}
                   countdownLabel={countdownLabel}
+                  startDays={startDays}
                   regionLabel={regionLabel}
                   permitStates={permitStates}
                   cta={undefined}

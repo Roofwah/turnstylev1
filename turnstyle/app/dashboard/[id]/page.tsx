@@ -115,9 +115,11 @@ function normaliseCampaign(raw: any): Campaign {
     promoter:      raw.promoter ?? null,
     promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
     promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
-    drawMechanic:  raw.mechanicType === 'SWEEPSTAKES' ? 'Sweepstakes - Random Draw'
-                 : raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer'
-                 : raw.drawMechanic ?? '',
+    drawMechanic:  raw.mechanicType === 'SWEEPSTAKES' ? 'Sweepstakes' :
+                   raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer' :
+                   raw.mechanicType === 'INSTANT_WIN' ? 'Instant Win' :
+                   raw.mechanicType === 'GAME_OF_SKILL' ? 'Game of Skill' :
+                   raw.mechanicType === 'OTHER' ? 'Other' : '',
     drawFrequency: (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('_', '_'),
     entryMechanic: raw.entryMechanic ?? '',
     regions:       raw.regions ?? [],
@@ -278,7 +280,7 @@ const daysUntilFn = (d: string | null) => {
 const startDays = daysUntilFn(source.promoStart)
 const endDays   = daysUntilFn(source.promoEnd)
 let countdownLabel: string | null = null
-if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
   if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
   else if (startDays === 0) countdownLabel = 'Starts today'
   else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -455,7 +457,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
   const startDays = daysUntil(source.promoStart)
   const endDays   = daysUntil(source.promoEnd)
   let countdownLabel: string | null = null
-  if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
+  if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status)) {
     if (startDays !== null && startDays > 0) countdownLabel = `${startDays} days to start`
     else if (startDays === 0) countdownLabel = 'Starts today'
     else if (startDays !== null && startDays < 0) countdownLabel = 'Started'
@@ -477,27 +479,74 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
         ].map(m => (
           <div key={m.label} className={`bg-white/[0.03] border rounded-xl p-4 transition-all ${editing ? 'border-white/[0.10]' : 'border-white/[0.06]'}`}>
             <div className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">{m.label}</div>
-            <div className="text-white font-black text-xl">{m.value}</div>
+            {m.label === 'Countdown' ? (
+              <div className={`font-black text-xl ${
+                startDays !== null && startDays <= 5 ? 'text-red-400' :
+                startDays !== null && startDays <= 10 ? 'text-amber-400' :
+                startDays !== null && startDays > 10 ? 'text-emerald-400' :
+                'text-white'
+              }`}>{m.value}</div>
+            ) : (
+              <div className="text-white font-black text-xl">{m.value}</div>
+            )}
             {m.sub && <div className="text-white/30 text-xs mt-0.5">{m.sub}</div>}
           </div>
         ))}
       </div>
       <div className="flex items-center gap-2 mb-8 flex-wrap">
-        {countdownLabel && (
-          <div className="px-3 py-1 rounded-md bg-sky-400/10 border border-sky-400/20">
-            <span className="text-sky-400 text-xs font-bold">{countdownLabel}</span>
-          </div>
-        )}
-        {permitStates.length > 0 && (
-          <>
-            <span className="text-white/30 text-xs">Permits required</span>
-            {permitStates.map(state => (
-              <span key={state} className={`text-xs font-bold px-2 py-1 rounded-md border ${permitColors[state]}`}>
-                {state}
-              </span>
-            ))}
-          </>
-        )}
+
+        {permitStates.length > 0 && (() => {
+          const businessDaysUntilStart = (() => {
+            if (!source.promoStart) return null
+            let count = 0
+            const d = new Date()
+            const end = new Date(source.promoStart)
+            while (d < end) {
+              d.setDate(d.getDate() + 1)
+              const day = d.getDay()
+              if (day !== 0 && day !== 6) count++
+            }
+            return count
+          })()
+          const permitLeadTimes: Record<string, number> = { ACT: 5.5, NSW: 2.5, SA: 10.5 }
+          return (
+            <div className="w-full mt-2 bg-white/[0.02] border border-white/[0.06] rounded-xl p-4">
+              <div className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-3">Permit Readiness</div>
+              <div className="space-y-2">
+                {permitStates.map(state => {
+                  const lead = permitLeadTimes[state]
+                  const days = businessDaysUntilStart
+                  let icon = '✅'
+                  let msg = ''
+                  let color = 'text-emerald-400'
+                  const estDate = new Date()
+                  let bd = 0
+                  while (bd < lead) {
+                    estDate.setDate(estDate.getDate() + 1)
+                    if (estDate.getDay() !== 0 && estDate.getDay() !== 6) bd++
+                  }
+                  const estStr= estDate.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+                  if (days === null) {
+                    icon = '—'; msg = 'No start date set'; color = 'text-white/30'
+                  } else if (days < 5.5) {
+                    icon = '❌'; msg = `Too late — starts in ${days} business day${days === 1 ? '' : 's'}`; color = 'text-red-400'
+                  } else if (state === 'SA' && days < 10.5) {
+                    icon = '⚠️'; msg = 'Rush only — est. issue ' + estStr; color = 'text-amber-400'
+                  } else {
+                    icon = '✅'; msg = 'Ready — est. issue ' + estStr + (state === 'SA' ? ' · Rush available' : ''); color = 'text-emerald-400'
+                  }
+                  return (
+                    <div key={state} className="flex items-center gap-3">
+                      <span className="text-base">{icon}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded border ${permitColors[state]}`}>{state}</span>
+                      <span className={`text-xs font-semibold ${color}`}>{msg}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
         {permitStates.length === 0 && (
           <span className="text-white/20 text-xs">No permits required</span>
         )}  <div className="ml-auto">
@@ -583,7 +632,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
                 </div>
 
                 <div className="flex gap-4 items-start">
-                  <span className="text-white/30 text-sm w-32 shrink-0">Mechanic</span>
+                  <span className="text-white/30 text-sm w-32 shrink-0">Type</span>
                   {editing ? <EditSelect value={draft.drawMechanic} onChange={v => updateDraft('drawMechanic', v)} options={MECHANIC_OPTIONS} />
                   : <span className="text-white/80 text-sm">{campaign.drawMechanic}</span>}
                 </div>
@@ -989,7 +1038,7 @@ if (['DRAFT','CONFIRMED','REVIEW','PENDING','SCHEDULED'].includes(campaign.statu
               <p className="text-white/40 text-sm mb-4">Draw information and dataset upload for this campaign.</p>
               <div className="space-y-3 mb-6">
                 <div className="flex gap-4">
-                  <span className="text-white/30 text-sm w-36 shrink-0">Draw Mechanic</span>
+                  <span className="text-white/30 text-sm w-36 shrink-0">Type</span>
                   <span className="text-white/80 text-sm">{campaign.drawMechanic || '—'}</span>
                 </div>
                 <div className="flex gap-4">

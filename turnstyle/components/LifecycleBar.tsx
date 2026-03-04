@@ -96,7 +96,7 @@ export default function LifecycleBar({
     }
 
     const buttonClass = isPrerequisiteMet
-      ? 'bg-white text-[#0a0a0f] font-black text-xs px-3 py-1.5 rounded transition-all hover:bg-white/90 whitespace-nowrap'
+      ? 'bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 font-black text-xs px-3 py-1.5 rounded transition-all hover:bg-emerald-400/20 whitespace-nowrap'
       : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 font-semibold text-xs px-3 py-1.5 rounded transition-all whitespace-nowrap'
 
       if (nextStepConfig.type === 'link' && nextStepConfig.href) {

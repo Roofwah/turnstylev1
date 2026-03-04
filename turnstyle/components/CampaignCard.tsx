@@ -8,6 +8,7 @@ interface CampaignCardProps {
   effectiveStatus: string
   hasApprovedQuote: boolean
   countdownLabel: string | null
+  startDays: number | null
   regionLabel: string
   permitStates: string[]
   cta: { label: string; color: string } | undefined
@@ -17,7 +18,7 @@ interface CampaignCardProps {
 }
 
 export default function CampaignCard({
-  campaign, status, effectiveStatus, hasApprovedQuote, countdownLabel,
+  campaign, status, effectiveStatus, hasApprovedQuote, countdownLabel, startDays,
   regionLabel, permitStates, cta, prizePoolTotalFormatted, promoStartFormatted, promoEndFormatted,
 }: CampaignCardProps) {
   const permitColors: Record<string, string> = {
@@ -63,11 +64,17 @@ export default function CampaignCard({
               <span className="text-white/30 text-xs">Dates </span>
               <span className="text-white/60 text-xs font-semibold">{promoStartFormatted} → {promoEndFormatted}</span>
             </div>
-            {countdownLabel && (
-              <div className="px-3 py-0.5 rounded-md bg-sky-400/10 border border-sky-400/20">
-                <span className="text-sky-400 text-xs font-bold">{countdownLabel}</span>
-              </div>
-            )}
+{countdownLabel && (() => {
+                const col = startDays !== null && startDays <= 5 ? 'text-red-400 bg-red-400/10 border-red-400/20' :
+                            startDays !== null && startDays <= 10 ? 'text-amber-400 bg-amber-400/10 border-amber-400/20' :
+                            startDays !== null && startDays > 10 ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' :
+                            'text-sky-400 bg-sky-400/10 border-sky-400/20'
+                return (
+                  <div className={"px-3 py-0.5 rounded-md border " + col}>
+                    <span className={"text-xs font-bold " + col.split(' ')[0]}>{countdownLabel}</span>
+                  </div>
+                )
+              })()}
             <div>
               <span className="text-white/30 text-xs">Regions </span>
               <span className="text-white/60 text-xs font-semibold">{regionLabel}</span>

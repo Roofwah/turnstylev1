@@ -52,6 +52,15 @@ export async function createCampaign(data: {
     },
   })
 
+
+  const mechanicTypeMap: Record<string, string> = {
+    'Sweepstakes': 'SWEEPSTAKES',
+    'Instant Win': 'INSTANT_WIN',
+    'Limited Offer': 'LIMITED_OFFER',
+    'Game of Skill': 'GAME_OF_SKILL',
+    'Other': 'OTHER',
+  }
+  const mechanicType = (mechanicTypeMap[data.drawMechanic] ?? 'OTHER') as any
   const campaign = await prisma.campaign.create({
     data: {
       tsCode: data.tsCode,
@@ -66,6 +75,7 @@ export async function createCampaign(data: {
       prizes: data.prizes,
       prizePoolTotal,
       notes: data.notes || null,
+      mechanicType,
       status: 'DRAFT',
     },
   })
