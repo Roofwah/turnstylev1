@@ -2,7 +2,7 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const FROM = 'onboarding@resend.dev'
+const FROM = 'noreply@status.turnstylehost.com'
 const BCC = 'chris@flowmarketing.com.au'
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
