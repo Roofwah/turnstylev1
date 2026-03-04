@@ -10,11 +10,12 @@ export async function GET(_req: NextRequest, { params }: { params: { promoterId:
   return NextResponse.json(promoter)
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { promoterId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ promoterId: string }> }) {
+  const { promoterId } = await params
   const body = await req.json()
   const { name, abn, address, contactName, contactEmail, contactPhone } = body
   const promoter = await prisma.promoter.update({
-    where: { id: params.promoterId },
+    where: { id: promoterId },
     data: {
       name:         name?.trim()         || undefined,
       abn:          abn?.trim()          || null,
@@ -27,9 +28,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { promoterId
   return NextResponse.json(promoter)
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { promoterId: string } }) {
-  try {
-    await prisma.promoter.delete({ where: { id: params.promoterId } })
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ promoterId: string }> }) {
+  const { promoterId } = await params
+  const promoter = await prisma.promoter.findUnique({
+    where:   { id: promoterId },
     return NextResponse.json({ ok: true })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 400 })

@@ -57,6 +57,8 @@ export default function TermsCommentsPage() {
   const [draft, setDraft] = useState<TermsDraft | null>(null)
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
@@ -153,7 +155,27 @@ export default function TermsCommentsPage() {
   const handleChangeClauseText = (slug: string, text: string) => {
     setEditedTexts(prev => ({ ...prev, [slug]: text }))
   }
-
+  const handleSubmit = async () => {
+    if (!draft) return
+    setSubmitting(true)
+    try {
+      const res = await fetch(`/api/campaigns/${id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'PENDING', force: true }),
+      })
+      if (!res.ok) throw new Error('Failed to submit')
+      setShowSubmitConfirm(false)
+      toast('Terms submitted — campaign is now Pending')
+      setTimeout(() => {
+        window.location.href = `/dashboard/${id}?tab=terms`
+      }, 1200)
+    } catch (e) {
+      toast('Failed to submit terms', 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
   const handleSaveRegenerate = async () => {
     if (!draft) return
     setSaving(true)
@@ -247,6 +269,13 @@ export default function TermsCommentsPage() {
               className="bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save & Regenerate'}
+            </button>
+            <button
+              onClick={() => setShowSubmitConfirm(true)}
+              disabled={saving || submitting}
+              className="bg-white text-[#0a0a0f] font-black text-xs px-3 py-1.5 rounded-lg hover:bg-white/90 transition-all disabled:opacity-50"
+            >
+              Submit →
             </button>
           </div>
         </div>
@@ -392,6 +421,35 @@ export default function TermsCommentsPage() {
             </div>
           )}
         </section>
+
+        {/* Submit confirmation modal */}
+      {showSubmitConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
+          <div className="bg-[#111118] border border-white/[0.10] rounded-2xl p-8 max-w-sm w-full">
+            <h2 className="text-white font-black text-xl mb-2">Submit Terms?</h2>
+            <p className="text-white/40 text-sm mb-1">
+              Draft version <span className="text-white font-bold">No. {draft?.version}</span> will be submitted for final review.
+            </p>
+            <p className="text-white/30 text-xs mb-6">
+              Once submitted, the campaign status will move to <span className="text-orange-400 font-semibold">Pending</span>. No further edits will be possible.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSubmitConfirm(false)}
+                className="flex-1 bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-white/10 transition-all">
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-2.5 rounded-xl hover:bg-white/90 transition-all disabled:opacity-50">
+                {submitting ? 'Submitting…' : 'Confirm & Submit'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </main>
     </div>
   )

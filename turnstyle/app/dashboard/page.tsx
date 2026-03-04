@@ -66,7 +66,8 @@ export default async function DashboardPage() {
       />
 
       {/* Nav */}
-      <nav className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+      <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
           <div className="hidden md:flex items-center gap-6">
@@ -79,6 +80,7 @@ export default async function DashboardPage() {
           <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
             <span className="text-white text-xs font-bold">A</span>
           </div>
+        </div>
         </div>
       </nav>
 

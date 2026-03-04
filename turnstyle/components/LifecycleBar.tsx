@@ -99,20 +99,12 @@ export default function LifecycleBar({
       ? 'bg-white text-[#0a0a0f] font-black text-xs px-3 py-1.5 rounded transition-all hover:bg-white/90 whitespace-nowrap'
       : 'bg-amber-500/20 border border-amber-500/40 text-amber-400 font-semibold text-xs px-3 py-1.5 rounded transition-all whitespace-nowrap'
 
-    const isApproveQuote = nextStepConfig.label === 'Approve Quote' || nextStepConfig.label?.includes('Approve Quote')
-
-    if (nextStepConfig.type === 'link' && nextStepConfig.href) {
-      if (isApproveQuote && onApproveQuote) {
+      if (nextStepConfig.type === 'link' && nextStepConfig.href) {
         return (
           <div className="flex flex-col items-end gap-1 min-w-[110px]">
             <span className="text-white/30 text-xs uppercase tracking-wider">Next Step</span>
             <button
-              type="button"
-              onClick={async (e) => {
-                e.preventDefault(); e.stopPropagation()
-                try { await onApproveQuote() }
-                catch (error) { console.error('Approve quote error:', error) }
-              }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(nextStepConfig.href!) }}
               className={buttonClass}
               disabled={disabled}
             >
@@ -121,18 +113,6 @@ export default function LifecycleBar({
           </div>
         )
       }
-      return (
-        <div className="flex flex-col items-end gap-1 min-w-[110px]">
-          <span className="text-white/30 text-xs uppercase tracking-wider">Next Step</span>
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(nextStepConfig.href!) }}
-            className={buttonClass}
-          >
-            {nextStepConfig.label} →
-          </button>
-        </div>
-      )
-    }
 
     return (
       <div className="flex flex-col items-end gap-1 min-w-[110px]">

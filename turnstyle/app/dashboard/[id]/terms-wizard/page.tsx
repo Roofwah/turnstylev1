@@ -4,8 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { getCampaign } from '@/app/actions/getCampaign'
 import Link from 'next/link'
-import { REPCO_TRADE, TEMPLATE_META as REPCO_META } from '@/lib/terms-templates/repco-trade'
-import { NAPA_TRADE, TEMPLATE_META as NAPA_META } from '@/lib/terms-templates/napa-trade'
+import { getTemplatesForCampaign, getAllTemplates, type TemplateEntry } from '@/lib/terms-templates'
 import { useNotify } from '@/components/useNotify'
 
 // Template registry
@@ -14,16 +13,7 @@ type TemplateData = {
   meta: { id: string; name: string; promoterKeyword?: string; audience?: string }
 }
 
-const TEMPLATES: Record<string, TemplateData> = {
-  'repco-trade': {
-    clauses: REPCO_TRADE as Clause[],
-    meta: REPCO_META,
-  },
-  'napa-trade': {
-    clauses: NAPA_TRADE as Clause[],
-    meta: NAPA_META,
-  },
-}
+
 
 interface PrizeTier { tier: string; description: string; qty: number; unitValue: number }
 
@@ -146,6 +136,7 @@ export default function TermsWizardPage() {
   const { toast, modal } = useNotify()
   const [campaign, setCampaign] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
+  const [availableTemplates, setAvailableTemplates] = useState<TemplateEntry[]>([])
   const [answers, setAnswers] = useState<Record<string, string | number>>({})
   const [sharing, setSharing]     = useState(false)
   const [shareLink, setShareLink] = useState('')
@@ -194,9 +185,13 @@ export default function TermsWizardPage() {
     return 'options' in gap || 'optionLabels' in gap || 'followUp' in gap
   }
 
-  const currentTemplate = TEMPLATES[selectedTemplate] || TEMPLATES['repco-trade']
-  const currentClauses = currentTemplate.clauses
-  const templateMeta = currentTemplate.meta
+  const currentTemplate = (
+    availableTemplates.find(t => t.meta.id === selectedTemplate) 
+    ?? availableTemplates[0] 
+    ?? getAllTemplates()[0]
+  )
+  const templateMeta = currentTemplate?.meta
+  const currentClauses = currentTemplate?.clauses ?? []
 
   const allQuestions: Question[] = useMemo(() => {
     const questions: Question[] = []
@@ -256,6 +251,19 @@ export default function TermsWizardPage() {
       UNCLAIMED_REDRAW:   String(answers.UNCLAIMED_REDRAW   ?? '[redraw date]'),
     }
   }, [campaign, answers])
+  useEffect(() => {
+    if (campaign) {
+      const templates = getTemplatesForCampaign(
+        campaign.promoter?.name ?? '',
+        campaign.drawMechanic
+      )
+      setAvailableTemplates(templates)
+      // Auto-select first matching template if current selection not in list
+      if (templates.length > 0 && !templates.find(t => t.meta.id === selectedTemplate)) {
+        setSelectedTemplate(templates[0].meta.id)
+      }
+    }
+  }, [campaign])
 
   const resolveText = useMemo(() => {
     return (text: string): { resolved: string; hasUnfilledGaps: boolean } => {
@@ -472,11 +480,14 @@ export default function TermsWizardPage() {
                   }}
                   className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm hover:bg-white/10 focus:outline-none focus:border-white/30 transition-colors"
                 >
-                  <option value="repco-trade">Based on: {REPCO_META.name}</option>
-                  <option value="napa-trade">Based on: {NAPA_META.name}</option>
+                  {availableTemplates.map(t => (
+                    <option key={t.meta.id} value={t.meta.id}>
+                      {t.meta.name}{t.meta.description ? ` — ${t.meta.description}` : ''}
+                    </option>
+                  ))}
                 </select>
                 <span className="text-white/30 text-xs">
-                  ({Object.keys(TEMPLATES).length} template{Object.keys(TEMPLATES).length !== 1 ? 's' : ''} available)
+                  ({availableTemplates.length} template{availableTemplates.length !== 1 ? 's' : ''} available)
                 </span>
               </div>
             </div>

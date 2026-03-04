@@ -18,51 +18,49 @@ export function getNextStepConfig(campaign: any): NextStepConfig | null {
     case 'CONFIRMED':
       return {
         label: 'Build Terms',
-        href: `/dashboard/${campaign.id}/terms-wizard`,
+        href: `/dashboard/${campaign.id}?tab=terms`,
         type: 'link',
       }
     case 'COMPILED':
       return {
         label: 'Share Terms',
         href: `/dashboard/${campaign.id}?tab=terms`,
-        type: 'share',
+        type: 'link',
       }
     case 'REVIEW':
       return {
         label: 'Review Changes',
-        href: `/dashboard/${campaign.id}/terms/comments`,
+        href: `/dashboard/${campaign.id}?tab=terms`,
         type: 'link',
       }
     case 'PENDING':
       return {
-        label: 'Mark Scheduled',
-        href: null,
-        type: 'advance',
-        requiresConfirmation: true,
+        label: 'Awaiting Approval',
+        href: `/dashboard/${campaign.id}?tab=overview`,
+        type: 'link',
       }
     case 'SCHEDULED':
       return {
-        label: 'Download Approved Terms',
-        href: null,
-        type: 'download',
+        label: 'Check Draw Details',
+        href: `/dashboard/${campaign.id}?tab=draw`,
+        type: 'link',
       }
     case 'LIVE':
       return {
-        label: 'Mark as Closed',
-        href: null,
-        type: 'advance',
-        requiresConfirmation: true,
+        label: 'Check Draw Details',
+        href: `/dashboard/${campaign.id}?tab=draw`,
+        type: 'link',
       }
     case 'CLOSED':
       return {
         label: 'Upload Dataset',
-        href: `/dashboard/${campaign.id}/draw/upload`,
+        href: `/dashboard/${campaign.id}?tab=draw`,
         type: 'link',
       }
     case 'DRAWN':
       return {
         label: 'See Winners',
-        href: `/dashboard/${campaign.id}/draw/winners`,
+        href: `/dashboard/${campaign.id}?tab=winners`,
         type: 'link',
       }
     case 'ARCHIVED':

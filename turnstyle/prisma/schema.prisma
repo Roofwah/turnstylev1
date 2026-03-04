@@ -90,6 +90,7 @@ model Campaign {
   quotes        Quote[]
   summaries     Summary[]
   documents     GeneratedDocument[]
+  auditLogs     AuditLog[]
   termsDrafts   TermsDraft[]
 
   @@map("campaigns")

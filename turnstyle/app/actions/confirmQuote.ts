@@ -41,10 +41,10 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
       
       if (approvedQuotes.length > 0) {
         // Quotes are already approved - ensure campaign status is also APPROVED
-        if (campaign.status !== CampaignStatus.APPROVED) {
+        if (campaign.status !== CampaignStatus.CONFIRMED) {
           await prisma.campaign.update({
             where: { id: campaignId },
-            data: { status: CampaignStatus.APPROVED },
+            data: { status: CampaignStatus.CONFIRMED },
           })
           revalidatePath('/dashboard')
           revalidatePath(`/dashboard/${campaignId}`)
@@ -73,7 +73,7 @@ export async function confirmQuote(campaignId: string, approvedById?: string) {
       // TODO: Run migration to add CONFIRMATION, REVIEW, PENDING, etc. to CampaignStatus enum
       await tx.campaign.update({
         where: { id: campaignId },
-        data: { status: CampaignStatus.APPROVED },
+        data: { status: CampaignStatus.CONFIRMED },
       })
 
       // Update all DRAFT quotes to APPROVED and create ApprovalRecords

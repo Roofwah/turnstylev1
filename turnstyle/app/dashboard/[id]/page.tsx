@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { calculateQuote } from '@/lib/quote-engine'
 import { getCampaign } from '@/app/actions/getCampaign'
 import { updateCampaign } from '@/app/actions/updateCampaign'
 import { deleteCampaign } from '@/app/actions/deleteCampaign'
 import { confirmQuote } from '@/app/actions/confirmQuote'
 
-export const dynamic = 'force-dynamic'
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,11 +64,18 @@ const FREQUENCY_OPTIONS = [
 ]
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  DRAFT:      { label: 'Draft',      color: 'text-white/50',    bg: 'bg-white/5',        border: 'border-white/10' },
-  QUOTE_SENT: { label: 'Quote Sent', color: 'text-amber-400',   bg: 'bg-amber-400/10',   border: 'border-amber-400/20' },
-  APPROVED:   { label: 'Approved',   color: 'text-emerald-400', bg: 'bg-emerald-400/10', border: 'border-emerald-400/20' },
-  ACTIVE:     { label: 'Active',     color: 'text-blue-400',    bg: 'bg-blue-400/10',    border: 'border-blue-400/20' },
-  ARCHIVED:   { label: 'Archived',   color: 'text-white/30',    bg: 'bg-white/5',        border: 'border-white/10' },
+  DRAFT:     { label: 'Draft',      color: 'text-white/50',     bg: 'bg-white/5',         border: 'border-white/10' },
+  CONFIRMED: { label: 'Confirmed',  color: 'text-emerald-400',  bg: 'bg-emerald-400/10',  border: 'border-emerald-400/20' },
+  COMPILED:  { label: 'Compiled',   color: 'text-blue-400',     bg: 'bg-blue-400/10',     border: 'border-blue-400/20' },
+  REVIEW:    { label: 'In Review',  color: 'text-amber-400',    bg: 'bg-amber-400/10',    border: 'border-amber-400/20' },
+  PENDING:   { label: 'Pending',    color: 'text-orange-400',   bg: 'bg-orange-400/10',   border: 'border-orange-400/20' },
+  SCHEDULED: { label: 'Scheduled',  color: 'text-purple-400',   bg: 'bg-purple-400/10',   border: 'border-purple-400/20' },
+  LIVE:      { label: 'Live',       color: 'text-emerald-400',  bg: 'bg-emerald-400/10',  border: 'border-emerald-400/20' },
+  CLOSED:    { label: 'Closed',     color: 'text-white/50',     bg: 'bg-white/5',         border: 'border-white/10' },
+  DRAWN:     { label: 'Drawn',      color: 'text-white/60',     bg: 'bg-white/5',         border: 'border-white/10' },
+  ARCHIVED:  { label: 'Archived',   color: 'text-white/30',     bg: 'bg-white/5',         border: 'border-white/10' },
+  // Legacy
+  APPROVED:  { label: 'Confirmed',  color: 'text-emerald-400',  bg: 'bg-emerald-400/10',  border: 'border-emerald-400/20' },
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -104,7 +111,7 @@ function normaliseCampaign(raw: any): Campaign {
     id:            raw.id,
     tsCode:        raw.tsCode ?? '',
     name:          raw.name ?? '',
-    status:        effectiveStatus,
+    status:        raw.status ?? 'DRAFT',
     promoter:      raw.promoter ?? null,
     promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
     promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
@@ -155,13 +162,16 @@ function EditTextarea({ value, onChange }: { value: string; onChange: (v: string
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-export default function CommandCentrePage() {
+function CommandCentrePageInner() {
   const params = useParams()
   const id = params.id as string
 
   const [loading, setLoading]         = useState(true)
   const [notFound, setNotFound]       = useState(false)
-  const [activeTab, setActiveTab]     = useState<'overview' | 'quote' | 'terms' | 'history'>('overview')
+  type TabId = 'overview' | 'quote' | 'terms' | 'abbr-terms' | 'qr-code' | 'loa' | 'draw' | 'winners' | 'history' | 'support'
+  const [activeTab, setActiveTab] = useState<TabId>('overview')
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [editing, setEditing]         = useState(false)
   const [campaign, setCampaign]       = useState<Campaign | null>(null)
   const [draft, setDraft]             = useState<Campaign | null>(null)
@@ -169,6 +179,11 @@ export default function CommandCentrePage() {
   const [saving, setSaving]           = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as TabId | null
+    if (tabParam) setActiveTab(tabParam)
+  }, [searchParams])
 
   useEffect(() => {
     getCampaign(id).then(raw => {
@@ -342,15 +357,17 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
 
       {/* Nav */}
-      <nav className="border-b border-white/[0.06] px-6 py-4 flex items-center justify-between sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
-  <div className="flex items-center gap-4">
-    <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
-    <span className="text-white/20">/</span>
-    <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">Campaigns</Link>
-    <span className="text-white/20">/</span>
-    <span className="text-white text-sm font-semibold truncate max-w-xs">{campaign.name}</span>
-  </div>
-</nav>
+      <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+            <span className="text-white/20">/</span>
+            <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">Campaigns</Link>
+            <span className="text-white/20">/</span>
+            <span className="text-white text-sm font-semibold truncate max-w-xs">{campaign.name}</span>
+          </div>
+        </div>
+      </nav>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
 
@@ -494,15 +511,16 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
             </div>
           ) : (
             <button
-              onClick={async () => {
-                try {
-                  const result = await confirmQuote(id)
-                  setConfirmedAt(result.confirmedAt)
-                  setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
-                } catch (error) {
-                  alert(error instanceof Error ? error.message : 'Failed to confirm quote')
-                }
-              }}
+            onClick={async () => {
+              try {
+                const result = await confirmQuote(id)
+                setConfirmedAt(result.confirmedAt)
+                setCampaign(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
+                setActiveTab('abbr-terms')
+              } catch (error) {
+                alert(error instanceof Error ? error.message : 'Failed to confirm quote')
+              }
+            }}
               className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-1.5 rounded-md hover:bg-white/90 transition-all">
               Confirm & Proceed →
             </button>
@@ -515,13 +533,24 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
 })()}
 
         {/* Tabs */}
-        <div className="flex items-center gap-1 mb-6 border-b border-white/[0.06]">
-          {(['overview', 'quote', 'terms', 'history'] as const).map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2.5 text-sm font-semibold capitalize transition-all border-b-2 -mb-px ${
-                activeTab === tab ? 'text-white border-white' : 'text-white/30 border-transparent hover:text-white/60'
+        <div className="flex items-center gap-1 mb-6 border-b border-white/[0.06] overflow-x-auto">
+          {([
+            { id: 'overview',   label: 'Overview' },
+            { id: 'quote',      label: 'Quote' },
+            { id: 'terms',      label: 'Terms' },
+            { id: 'abbr-terms', label: 'Abbr Terms' },
+            { id: 'qr-code',    label: 'QR Code' },
+            { id: 'loa',        label: 'LOA' },
+            { id: 'draw',       label: 'Draw' },
+            { id: 'winners',    label: 'Winners' },
+            { id: 'history',    label: 'History' },
+            { id: 'support',    label: 'Support' },
+          ] as { id: TabId; label: string }[]).map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px ${
+                activeTab === tab.id ? 'text-white border-white' : 'text-white/30 border-transparent hover:text-white/60'
               }`}>
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -782,28 +811,255 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
         )}
 
        {/* ── Tab: Terms ── */}
-{activeTab === 'terms' && (
+       {activeTab === 'terms' && (
   <div className="max-w-2xl space-y-4">
+
+    {/* Abbreviated T&Cs — always visible */}
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
       <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Abbreviated Terms & Conditions</h2>
-      <p className="text-white/40 text-sm mb-4">Free — auto-generated from campaign data. Includes QR code linked permanently to this campaign.</p>
+      <p className="text-white/40 text-sm mb-4">Auto-generated from campaign data. Includes QR code linked permanently to this campaign.</p>
       <button
         onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
         className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
         View Abbreviated T&Cs →
       </button>
     </div>
+
+    {/* Full T&Cs — locked for DRAFT only */}
     <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
       <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Full Terms & Conditions</h2>
-      <p className="text-white/40 text-sm mb-4">Unlocks after quote approval. Full compliance wizard with permit applications, draw administration and legal sign-off.</p>
-      <button onClick={() => setActiveTab('quote')}
-        className="bg-white/[0.06] border border-white/10 text-white/40 text-sm font-semibold px-6 py-2.5 rounded-xl cursor-not-allowed">
-        🔒 Approve Quote to Unlock
-      </button>
+
+      {campaign.status === 'DRAFT' ? (
+        <>
+          <p className="text-white/40 text-sm mb-4">Unlocks after quote approval.</p>
+          <button onClick={() => setActiveTab('quote')}
+            className="bg-white/[0.06] border border-white/10 text-white/40 text-sm font-semibold px-6 py-2.5 rounded-xl cursor-not-allowed">
+            🔒 Approve Quote to Unlock
+          </button>
+        </>
+      ) : campaign.status === 'CONFIRMED' ? (
+        <>
+          <p className="text-white/40 text-sm mb-4">Quote approved. Build your full terms using the wizard.</p>
+          <button
+            onClick={() => window.location.href = `/dashboard/${id}/terms-wizard`}
+            className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+            Build Full Terms →
+          </button>
+        </>
+      ) : campaign.status === 'COMPILED' ? (
+        <>
+          <p className="text-white/40 text-sm mb-4">Terms compiled. Share with stakeholders for review.</p>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={() => window.location.href = `/dashboard/${id}/terms-wizard`}
+              className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
+              Edit Terms
+            </button>
+            <button
+              onClick={() => window.location.href = `/dashboard/${id}/terms/comments`}
+              className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+              Share for Review →
+            </button>
+          </div>
+        </>
+      ) : campaign.status === 'REVIEW' ? (
+        <>
+          <p className="text-white/40 text-sm mb-4">Terms are under review. Check feedback and comments from stakeholders.</p>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={() => window.location.href = `/dashboard/${id}/terms/comments`}
+              className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+              View Comments & Changes →
+            </button>
+            <button
+              onClick={() => window.location.href = `/dashboard/${id}/terms-wizard`}
+              className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
+              Edit Terms
+            </button>
+          </div>
+        </>
+      ) : ['PENDING', 'SCHEDULED', 'LIVE', 'CLOSED', 'DRAWN', 'ARCHIVED'].includes(campaign.status) ? (
+        <>
+          <p className="text-white/40 text-sm mb-4">Final terms locked. Download a copy below.</p>
+          <button
+            onClick={() => window.open(`/dashboard/${id}/terms-wizard`, '_blank')}
+            className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
+            View Final Terms
+          </button>
+        </>
+      ) : null}
     </div>
+
   </div>
 )}
+{/* ── Abbr Terms ── */}
+{activeTab === 'abbr-terms' && (
+          <div className="max-w-2xl space-y-4">
+            <div className="bg-emerald-400/5 border border-emerald-400/20 rounded-2xl p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-emerald-400 text-lg">✓</span>
+                <h2 className="text-emerald-400 font-bold text-sm uppercase tracking-widest">Quote Accepted</h2>
+              </div>
+              <p className="text-white/40 text-sm mb-4">Your abbreviated terms and QR code have been generated and are ready to use.</p>
+              <button
+                onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
+                className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+                View Abbreviated T&Cs →
+              </button>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Next Step — Full Terms</h2>
+              <p className="text-white/40 text-sm mb-4">Build your full terms and conditions using our wizard. Includes thousands of template clauses and AI-driven preflight check.</p>
+              {campaign.status === 'CONFIRMED' || campaign.status === 'DRAFT' ? (
+                <button
+                  onClick={() => window.location.href = `/dashboard/${id}/terms-wizard`}
+                  className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+                  Compile Full Terms →
+                </button>
+              ) : (
+                <div className="flex items-center gap-2 text-white/40 text-sm">
+                  <span>✓</span> Terms compiled
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
+        {/* ── QR Code ── */}
+        {activeTab === 'qr-code' && (
+          <div className="max-w-2xl">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">QR Code</h2>
+              <p className="text-white/40 text-sm mb-6">This QR code links permanently to your campaign page at <span className="text-white/60 font-mono text-xs">turnstylehost.com/campaign/{campaign.tsCode}</span></p>
+              <button
+                onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
+                className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+                View QR Code →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── LOA ── */}
+        {activeTab === 'loa' && (
+          <div className="max-w-2xl">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Letter of Authority</h2>
+              <p className="text-white/40 text-sm mb-4">Required for permit applications in NSW, SA, and ACT where prize pool thresholds are met.</p>
+              {(() => {
+                const r = campaign.regions ?? []
+                const prize = prizePoolTotal
+                const permitStates: string[] = []
+                if ((r.includes('national_au') || r.includes('ACT')) && prize > 3500) permitStates.push('ACT')
+                if ((r.includes('national_au') || r.includes('SA')) && prize > 5000) permitStates.push('SA')
+                if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
+                return permitStates.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-amber-400 text-sm font-semibold">Permits required: {permitStates.join(', ')}</p>
+                    <button
+                      onClick={() => window.open(`/dashboard/${id}/loa`, '_blank')}
+                      className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+                      View / Complete LOA →
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-emerald-400 text-sm font-semibold">✓ No permits required for this campaign</p>
+                )
+              })()}
+            </div>
+          </div>
+        )}
+
+        {/* ── Draw ── */}
+        {activeTab === 'draw' && (
+          <div className="max-w-2xl space-y-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Draw Details</h2>
+              <p className="text-white/40 text-sm mb-4">Draw information and dataset upload for this campaign.</p>
+              <div className="space-y-3 mb-6">
+                <div className="flex gap-4">
+                  <span className="text-white/30 text-sm w-36 shrink-0">Draw Mechanic</span>
+                  <span className="text-white/80 text-sm">{campaign.drawMechanic || '—'}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-white/30 text-sm w-36 shrink-0">Draw Frequency</span>
+                  <span className="text-white/80 text-sm">{campaign.drawFrequency || '—'}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="text-white/30 text-sm w-36 shrink-0">Final Draw Date</span>
+                  <span className="text-white/80 text-sm">{quote.finalDrawDate || '—'}</span>
+                </div>
+              </div>
+              {['SCHEDULED', 'LIVE', 'CLOSED'].includes(campaign.status) && (
+                <div className="border-t border-white/[0.06] pt-4 mt-4">
+                  <h3 className="text-white/60 text-xs font-bold uppercase tracking-widest mb-2">Dataset Upload</h3>
+                  <p className="text-white/40 text-sm mb-3">Send the dataset upload link to the person responsible for reporting. File must be uploaded at least 2 hours before draw time.</p>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 font-mono text-xs text-white/40 mb-3">
+                    {campaign.promoter?.contactEmail || 'No contact email set'}
+                  </div>
+                  <button className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
+                    Generate Upload Link →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Winners ── */}
+        {activeTab === 'winners' && (
+          <div className="max-w-2xl">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Winners</h2>
+              {campaign.status === 'DRAWN' || campaign.status === 'ARCHIVED' ? (
+                <div className="space-y-4">
+                  <p className="text-white/40 text-sm">Draw results from PureRandom. Please review and confirm within 2 business days.</p>
+                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4">
+                    <p className="text-white/20 text-sm text-center">Draw certificate will appear here once connected to PureRandom</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-white/30 text-sm">Winners will be available after the draw has been completed.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Support ── */}
+        {activeTab === 'support' && (
+          <div className="max-w-2xl space-y-4">
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Support</h2>
+              <p className="text-white/40 text-sm mb-6">Need help with your campaign? Contact the Turnstyle team.</p>
+              <div className="space-y-3">
+                <a href="mailto:support@turnstylehost.com"
+                  className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition-all">
+                  <span className="text-xl">✉</span>
+                  <div>
+                    <div className="text-white text-sm font-semibold">Email Support</div>
+                    <div className="text-white/40 text-xs">support@turnstylehost.com</div>
+                  </div>
+                </a>
+                <a href="tel:+61280000000"
+                  className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition-all">
+                  <span className="text-xl">📞</span>
+                  <div>
+                    <div className="text-white text-sm font-semibold">Phone Support</div>
+                    <div className="text-white/40 text-xs">Mon–Fri, 9am–5pm AEST</div>
+                  </div>
+                </a>
+              </div>
+            </div>
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-3 opacity-60">Campaign Reference</h2>
+              <div className="space-y-2 font-mono text-xs text-white/40">
+                <div>Campaign ID: <span className="text-white/60">{campaign.id}</span></div>
+                <div>TS Code: <span className="text-white/60">{campaign.tsCode}</span></div>
+                <div>Status: <span className="text-white/60">{campaign.status}</span></div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* ── History ── */}
         {activeTab === 'history' && (
           <div className="max-w-2xl">
@@ -826,32 +1082,20 @@ if (['DRAFT','APPROVED','REVIEW','PENDING','SCHEDULED'].includes(campaign.status
             )}
           </div>
         )}
-{showDeleteConfirm && (
-  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-    <div className="bg-[#111118] border border-white/[0.10] rounded-2xl p-8 max-w-sm w-full">
-      <h2 className="text-white font-black text-xl mb-2">Delete campaign?</h2>
-      <p className="text-white/40 text-sm mb-2">
-        This will permanently delete <span className="text-white font-semibold">{campaign.name}</span> and all associated quotes, approvals and documents.
-      </p>
-      <p className="text-red-400/70 text-xs mb-6">This action cannot be undone.</p>
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowDeleteConfirm(false)}
-          className="flex-1 bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-white/10 transition-all">
-          Cancel
-        </button>
-        <button
-          onClick={async () => {
-            await deleteCampaign(id)
-          }}
-          className="flex-1 bg-red-500 text-white font-black text-sm py-2.5 rounded-xl hover:bg-red-600 transition-all">
-          Yes, Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+
       </main>
     </div>
+  )
+}
+
+export default function CommandCentrePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="text-white/30 text-sm">Loading...</div>
+      </div>
+    }>
+      <CommandCentrePageInner />
+    </Suspense>
   )
 }

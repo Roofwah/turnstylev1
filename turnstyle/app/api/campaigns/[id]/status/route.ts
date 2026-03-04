@@ -121,14 +121,16 @@ export async function PATCH(
         }
         break
 
-      case 'REVIEW':
-        if (newStatus === 'PENDING') {
-          const hasApproval = campaign.termsDrafts.some((d: any) =>
-            d.approvals.some((a: any) => a.status === 'APPROVED')
-          )
-          if (!hasApproval) prerequisiteError = 'Terms must be approved before advancing to PENDING'
-        }
-        break
+        case 'REVIEW':
+          if (newStatus === 'PENDING') {
+            if (!force) {
+              const hasApproval = campaign.termsDrafts.some((d: any) =>
+                d.approvals.some((a: any) => a.status === 'APPROVED')
+              )
+              if (!hasApproval) prerequisiteError = 'Terms must be approved before advancing to PENDING'
+            }
+          }
+          break
 
       case 'PENDING':
         if (newStatus === 'SCHEDULED') {

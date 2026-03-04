@@ -4,8 +4,9 @@ import { prisma } from '@/lib/prisma'
 // DELETE — remove template from promoter
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: { promoterId: string; templateId: string } }
+  { params }: { params: Promise<{ promoterId: string; templateId: string }> }
 ) {
-  await prisma.promoterTemplate.delete({ where: { id: params.templateId } })
+  const { templateId } = await params
+  await prisma.promoterTemplate.delete({ where: { id: templateId } })
   return NextResponse.json({ ok: true })
 }
