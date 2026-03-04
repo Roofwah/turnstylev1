@@ -54,7 +54,7 @@ export async function generateQuote(campaignId: string) {
       totalIncGst:   quote.totalIncGst,
       validUntil:    new Date(quote.validUntil),
       engineVersion: '0.1.5',
-      snapshotJson:  { campaign: raw, quote },
+      snapshotJson:  { campaign: raw, quote } as any,
     },
   })
 
