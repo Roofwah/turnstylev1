@@ -163,7 +163,7 @@ export async function updateCampaign(id: string, data: {
         gstAmount:    quote.gstAmount,
         totalIncGst:  quote.totalIncGst,
         validUntil:   new Date(quote.validUntil),
-        snapshotJson: { campaign: updated, quote },
+        snapshotJson: { campaign: updated, quote } as any,
       },
     })
   }
