@@ -102,6 +102,21 @@ await prisma.quote.create({
   },
 })
 
+try {
+  const { sendDraftEmail } = await import('@/lib/email/campaign-notifications')
+  await sendDraftEmail({
+    campaignId:     campaign.id,
+    campaignName:   campaign.name,
+    tsCode:         campaign.tsCode,
+    promoterName:   data.promoterName,
+    promoterEmail:  data.contactEmail,
+    promoStart:     data.promoStart,
+    promoEnd:       data.promoEnd,
+    prizePoolTotal: quote.totalIncGst,
+  })
+} catch (e) {
+  console.error('[email] Failed to send draft email:', e)
+}
 redirect(`/dashboard/${campaign.id}`)
   
 }
