@@ -300,7 +300,8 @@ model AuditLog {
   metadataJson Json?    @map("metadata_json")
   createdAt    DateTime @default(now()) @map("created_at")
 
-  actor User @relation(fields: [actorId], references: [id])
+  actor      User     @relation(fields: [actorId], references: [id])
+  campaign   Campaign @relation(fields: [entityId], references: [id])
 
   @@index([entityType, entityId])
   @@index([actorId])
