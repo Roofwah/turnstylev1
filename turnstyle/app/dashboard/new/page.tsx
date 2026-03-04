@@ -255,14 +255,14 @@ export default function BuildFormPage() {
 
       {/* Nav */}
       <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">← Campaigns</Link>
-            <span className="text-white/20">/</span>
-            <span className="text-white text-sm font-semibold">New Campaign</span>
-          </div>
-          <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
-        </div>
+      <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-6">
+  <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+  <div className="flex items-center gap-4">
+    <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">← Campaigns</Link>
+    <span className="text-white/20">/</span>
+    <span className="text-white text-sm font-semibold">New Campaign</span>
+  </div>
+</div>
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
