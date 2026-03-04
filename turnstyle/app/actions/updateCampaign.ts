@@ -40,7 +40,7 @@ export async function updateCampaign(id: string, data: {
     const approvedQuotes = await prisma.quote.findMany({
       where: {
         campaignId: id,
-        status: QuoteStatus.ACCEPTED,
+        status: QuoteStatus.APPROVED,
       },
     })
     
@@ -59,7 +59,7 @@ export async function updateCampaign(id: string, data: {
       await prisma.quote.updateMany({
         where: {
           campaignId: id,
-          status: QuoteStatus.ACCEPTED,
+          status: QuoteStatus.APPROVED,
         },
         data: {
           status: QuoteStatus.DRAFT,
