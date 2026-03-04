@@ -20,6 +20,7 @@ export interface TemplateClause {
   slug: string
   label: string
   text: string
+  gaps?: unknown[]
 }
 
 export interface TemplateMeta {
