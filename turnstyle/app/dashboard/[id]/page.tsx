@@ -200,6 +200,7 @@ function CommandCentrePageInner() {
   ]
 
   function startEditing() {
+    setActiveTab("overview")
     setDraft({ ...campaign! })
     setEditing(true)
     setApprovalWarning(false)
