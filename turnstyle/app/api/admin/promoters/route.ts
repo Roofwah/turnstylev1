@@ -14,7 +14,6 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
-  const { name, abn, address, contactName, contactEmail, contactPhone } = body
 
   if (!name?.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
@@ -27,7 +26,6 @@ export async function POST(req: NextRequest) {
       address:      address?.trim()      || null,
       contactName:  contactName?.trim()  || null,
       contactEmail: contactEmail?.trim() || null,
-      contactPhone: contactPhone?.trim() || null,
     },
   })
 

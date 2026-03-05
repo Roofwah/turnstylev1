@@ -19,7 +19,6 @@ export async function updateCampaign(id: string, data: {
     abn?: string
     contactName?: string
     contactEmail?: string
-    contactPhone?: string
   }
   revertToDraft?: boolean
 }) {
@@ -125,7 +124,6 @@ export async function updateCampaign(id: string, data: {
           ...(data.promoter.abn          !== undefined && { abn: data.promoter.abn }),
           ...(data.promoter.contactName  !== undefined && { contactName: data.promoter.contactName }),
           ...(data.promoter.contactEmail !== undefined && { contactEmail: data.promoter.contactEmail }),
-          ...(data.promoter.contactPhone !== undefined && { contactPhone: data.promoter.contactPhone }),
         },
       })
     }

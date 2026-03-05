@@ -14,7 +14,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ pro
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ promoterId: string }> }) {
   const { promoterId } = await params
   const body = await req.json()
-  const { name, abn, address, contactName, contactEmail, contactPhone } = body
   const promoter = await prisma.promoter.update({
     where: { id: promoterId },
     data: {

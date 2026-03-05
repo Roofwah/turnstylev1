@@ -18,7 +18,6 @@ interface Promoter {
   address: string | null
   contactName: string | null
   contactEmail: string | null
-  contactPhone: string | null
   templates: PromoterTemplate[]
 }
 
@@ -110,7 +109,6 @@ export default function AdminPromotersPage() {
         address:      refAddress.current?.value?.trim()      || null,
         contactName:  refContactName.current?.value?.trim()  || null,
         contactEmail: refContactEmail.current?.value?.trim() || null,
-        contactPhone: refContactPhone.current?.value?.trim() || null,
       }),
     })
     setSaving(false)
@@ -143,7 +141,6 @@ export default function AdminPromotersPage() {
         address:      refEditAddress.current?.value?.trim()      || null,
         contactName:  refEditContactName.current?.value?.trim()  || null,
         contactEmail: refEditContactEmail.current?.value?.trim() || null,
-        contactPhone: refEditContactPhone.current?.value?.trim() || null,
       }),
     })
     setSaving(false)
@@ -300,7 +297,6 @@ export default function AdminPromotersPage() {
                       <div className="space-y-3">
                         <div><label className={LABEL_CLS}>Contact name</label><input ref={refEditContactName} defaultValue={selected.contactName ?? ''} className={INPUT_CLS} /></div>
                         <div><label className={LABEL_CLS}>Contact email</label><input ref={refEditContactEmail} defaultValue={selected.contactEmail ?? ''} className={INPUT_CLS} /></div>
-                        <div><label className={LABEL_CLS}>Contact phone</label><input ref={refEditContactPhone} defaultValue={selected.contactPhone ?? ''} className={INPUT_CLS} /></div>
                       </div>
                     </div>
                     <div className="flex gap-3 pt-2">
@@ -321,11 +317,9 @@ export default function AdminPromotersPage() {
                     <h2 className="text-white font-black text-2xl">{selected.name}</h2>
                     {selected.abn     && <p className="text-white/40 text-sm mt-1">ABN {selected.abn}</p>}
                     {selected.address && <p className="text-white/30 text-sm">{selected.address}</p>}
-                    {(selected.contactName || selected.contactEmail || selected.contactPhone) && (
                       <div className="mt-3">
                         {selected.contactName  && <p className="text-white/50 text-sm">{selected.contactName}</p>}
                         {selected.contactEmail && <p className="text-white/30 text-sm">{selected.contactEmail}</p>}
-                        {selected.contactPhone && <p className="text-white/30 text-sm">{selected.contactPhone}</p>}
                       </div>
                     )}
                   </div>

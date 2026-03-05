@@ -30,7 +30,6 @@ interface Campaign {
     abn: string
     contactName: string
     contactEmail: string
-    contactPhone: string
   } | null
   promoStart: string
   promoEnd: string
@@ -699,7 +698,6 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                   { label: 'ABN',     key: 'abn' },
                   { label: 'Contact', key: 'contactName' },
                   { label: 'Email',   key: 'contactEmail' },
-                  { label: 'Phone',   key: 'contactPhone' },
                 ].map(row => (
                   <div key={row.label} className="flex gap-4 items-start">
                     <span className="text-white/30 text-sm w-32 shrink-0">{row.label}</span>
