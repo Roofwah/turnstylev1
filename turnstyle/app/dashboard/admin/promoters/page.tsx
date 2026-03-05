@@ -321,7 +321,6 @@ export default function AdminPromotersPage() {
                         {selected.contactName  && <p className="text-white/50 text-sm">{selected.contactName}</p>}
                         {selected.contactEmail && <p className="text-white/30 text-sm">{selected.contactEmail}</p>}
                       </div>
-                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={() => setEditing(true)}
