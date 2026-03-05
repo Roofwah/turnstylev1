@@ -84,7 +84,8 @@ export async function PATCH(
       return NextResponse.json(updated)
     }
 
-    if (!isForwardProgression(currentStatus, newStatus as CampaignStatus)) {
+    const isCompiledToPending = currentStatus === 'COMPILED' && newStatus === 'PENDING'
+    if (!isForwardProgression(currentStatus, newStatus as CampaignStatus) && !isCompiledToPending) {
       return NextResponse.json(
         {
           error: `Cannot move from ${currentStatus} to ${newStatus}. Only forward progression is allowed.`,
