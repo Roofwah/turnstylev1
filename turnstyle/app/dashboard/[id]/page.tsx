@@ -940,12 +940,22 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
         </>
       ) : ['PENDING', 'SCHEDULED', 'LIVE', 'CLOSED', 'DRAWN', 'ARCHIVED'].includes(campaign.status) ? (
         <>
-          <p className="text-white/40 text-sm mb-4">Final terms locked. Download a copy below.</p>
-          <button
-            onClick={() => window.open(`/dashboard/${id}/terms-wizard`, '_blank')}
-            className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
-            View Final Terms
-          </button>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs font-bold px-2 py-0.5 rounded bg-emerald-400/10 border border-emerald-400/20 text-emerald-400">FINAL</span>
+            <p className="text-white/40 text-sm">Terms are locked. View or download a copy below.</p>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={() => window.open(`/dashboard/${id}/terms-wizard?readonly=true`, '_blank')}
+              className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
+              View Final Terms →
+            </button>
+            <button
+              onClick={() => window.open(`/api/campaigns/${id}/terms-pdf`, '_blank')}
+              className="bg-white/[0.06] border border-white/10 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-white/10 transition-all">
+              Download PDF →
+            </button>
+          </div>
         </>
       ) : null}
     </div>

@@ -139,6 +139,8 @@ export default function TermsWizardPage() {
   const [availableTemplates, setAvailableTemplates] = useState<TemplateEntry[]>([])
   const [answers, setAnswers] = useState<Record<string, string | number>>({})
   const [sharing, setSharing]     = useState(false)
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+  const isReadonly = searchParams?.get('readonly') === 'true'
   const [shareLink, setShareLink] = useState('')
   const [copied, setCopied]       = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -412,7 +414,7 @@ export default function TermsWizardPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {showDocument && (
+            {showDocument && !isReadonly && (
               <button
                 className="flex items-center justify-center bg-amber-500/20 border border-amber-500/40 text-amber-400 p-2 rounded-lg hover:bg-amber-500/30 transition-all"
                 title="AI Assistant"
@@ -420,7 +422,7 @@ export default function TermsWizardPage() {
                 <img src="/ai.svg" alt="AI" className="w-4 h-4" />
               </button>
             )}
-            {showDocument && shareLink && (
+            {showDocument && shareLink && !isReadonly && (
               <button
                 onClick={() => {
                   modal({
@@ -437,12 +439,17 @@ export default function TermsWizardPage() {
                 </svg>
               </button>
             )}
+            {!isReadonly && (
             <button
               disabled={sharing}
               onClick={saveAndShare}
               className="bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50">
               {sharing ? 'Saving...' : 'Save'}
             </button>
+            )}
+            {isReadonly && (
+              <span className="text-xs font-bold px-2 py-1 rounded bg-emerald-400/10 border border-emerald-400/20 text-emerald-400">FINAL</span>
+            )}
             <button
               onClick={() => window.print()}
               className="bg-white text-[#0a0a0f] font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-white/90 transition-all">
