@@ -646,6 +646,7 @@ export default function TermsWizardPage() {
             </div>
           </div>
 
+          {!isReadonly && (
           <div className="mt-6 flex justify-center pb-16">
             <button
               onClick={handleEditAnswers}
@@ -653,6 +654,7 @@ export default function TermsWizardPage() {
               ← Edit answers
             </button>
           </div>
+          )}
         </main>
       )}
     </div>

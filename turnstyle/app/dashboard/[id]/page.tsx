@@ -506,7 +506,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
       </div>
       <div className="flex items-center gap-2 mb-8 flex-wrap">
 
-        {permitStates.length > 0 && (() => {
+        {permitStates.length > 0 && ['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING'].includes(campaign.status) && (() => {
           const businessDaysUntilStart = (() => {
             if (!source.promoStart) return null
             let count = 0
