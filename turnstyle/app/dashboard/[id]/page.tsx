@@ -138,6 +138,11 @@ function normaliseCampaign(raw: any): Campaign {
       approvedAt: q.approvedAt,
     })) ?? [],
     auditLogs:     raw.auditLogs ?? [],
+    drawSchedule:  Array.isArray(raw.drawSchedule) ? raw.drawSchedule : [],
+    permitLOASigned: raw.permitLOASigned ?? false,
+    permitNSW:     raw.permitNSW ?? null,
+    permitSA:      raw.permitSA ?? null,
+    permitACT:     raw.permitACT ?? null,
   }
 }
 
