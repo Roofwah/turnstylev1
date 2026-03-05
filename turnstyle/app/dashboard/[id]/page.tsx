@@ -43,6 +43,11 @@ interface Campaign {
   notes: string
   quotes?: { id: string; status: string; quoteNumber: string; approvedAt?: string | null }[]
   auditLogs?: { id: string; action: string; actorId: string; createdAt: string }[]
+  drawSchedule: any[]
+  permitLOASigned: boolean
+  permitNSW: string | null
+  permitSA: string | null
+  permitACT: string | null
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
