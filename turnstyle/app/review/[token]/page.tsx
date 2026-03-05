@@ -389,13 +389,16 @@ export default function ReviewPage() {
 
     fetch(`/api/terms/review/${token}`)
       .then(async (res) => {
+        const data = await res.json()
         if (!res.ok) {
-          const errorText = await res.text()
-          throw new Error(errorText || `Failed to load: ${res.status}`)
+          if (data.locked) {
+            setError('LOCKED')
+          } else {
+            setError(data.error || `Failed to load: ${res.status}`)
+          }
+          setLoading(false)
+          return
         }
-        return res.json()
-      })
-      .then((data) => {
         setDraft(data)
         setLoading(false)
       })
@@ -413,11 +416,22 @@ export default function ReviewPage() {
     )
   }
 
+  if (error === 'LOCKED') {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <div className="text-4xl mb-4">🔒</div>
+          <h1 className="text-white font-black text-xl mb-2">Terms Submitted</h1>
+          <p className="text-white/40 text-sm">These terms have been finalised and submitted. This review link is no longer active.</p>
+        </div>
+      </div>
+    )
+  }
   if (error || !draft) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-red-400">
-          {error || 'Terms draft not found'}
+        {error || 'Terms draft not found'}
         </div>
       </div>
     )
