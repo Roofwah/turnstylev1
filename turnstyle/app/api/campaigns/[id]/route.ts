@@ -41,3 +41,26 @@ export async function GET(
     )
   }
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await req.json()
+    const campaign = await prisma.campaign.update({
+      where: { id },
+      data: {
+        ...(body.drawSchedule !== undefined && { drawSchedule: body.drawSchedule }),
+      },
+    })
+    return NextResponse.json(campaign)
+  } catch (e: any) {
+    console.error('PATCH /api/campaigns/[id] error:', e)
+    return NextResponse.json(
+      { error: e.message || 'Failed to update campaign' },
+      { status: 500 }
+    )
+  }
+}

@@ -7,6 +7,8 @@ import { calculateQuote } from '@/lib/quote-engine'
 import { getCampaign } from '@/app/actions/getCampaign'
 import { updateCampaign } from '@/app/actions/updateCampaign'
 import { deleteCampaign } from '@/app/actions/deleteCampaign'
+import DrawScheduleTab from '@/components/DrawScheduleTab'
+import { DrawEvent } from '@/lib/draw-schedule'
 import { confirmQuote } from '@/app/actions/confirmQuote'
 
 
@@ -1030,38 +1032,10 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
 
         {/* ── Draw ── */}
         {activeTab === 'draw' && (
-          <div className="max-w-2xl space-y-4">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
-              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Draw Details</h2>
-              <p className="text-white/40 text-sm mb-4">Draw information and dataset upload for this campaign.</p>
-              <div className="space-y-3 mb-6">
-                <div className="flex gap-4">
-                  <span className="text-white/30 text-sm w-36 shrink-0">Type</span>
-                  <span className="text-white/80 text-sm">{campaign.drawMechanic || '—'}</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="text-white/30 text-sm w-36 shrink-0">Draw Frequency</span>
-                  <span className="text-white/80 text-sm">{campaign.drawFrequency || '—'}</span>
-                </div>
-                <div className="flex gap-4">
-                  <span className="text-white/30 text-sm w-36 shrink-0">Final Draw Date</span>
-                  <span className="text-white/80 text-sm">{quote.finalDrawDate || '—'}</span>
-                </div>
-              </div>
-              {['SCHEDULED', 'LIVE', 'CLOSED'].includes(campaign.status) && (
-                <div className="border-t border-white/[0.06] pt-4 mt-4">
-                  <h3 className="text-white/60 text-xs font-bold uppercase tracking-widest mb-2">Dataset Upload</h3>
-                  <p className="text-white/40 text-sm mb-3">Send the dataset upload link to the person responsible for reporting. File must be uploaded at least 2 hours before draw time.</p>
-                  <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-3 font-mono text-xs text-white/40 mb-3">
-                    {campaign.promoter?.contactEmail || 'No contact email set'}
-                  </div>
-                  <button className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
-                    Generate Upload Link →
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+          <DrawScheduleTab campaign={campaign} onSave={async (schedule: DrawEvent[]) => {
+            await fetch(`/api/campaigns/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawSchedule: schedule }) })
+            setCampaign(prev => prev ? { ...prev, drawSchedule: schedule } : prev)
+          }} />
         )}
 
         {/* ── Winners ── */}

@@ -67,6 +67,7 @@ model Campaign {
   promoEnd       DateTime?      @map("promo_end") @db.Date
   mechanicType   MechanicType   @default(OTHER) @map("mechanic_type")
   entryMechanic  String?        @map("entry_mechanic")
+  drawSchedule   Json?          @map("draw_schedule")
   drawFrequency  DrawFrequency  @default(AT_CONCLUSION) @map("draw_frequency")
   regions        String[]
   prizes         Json           @default("[]")
@@ -102,6 +103,7 @@ model PromoterTemplate {
   templateFileId String        @map("template_file_id")
   entryMechanic  String?       @map("entry_mechanic")
   regions        String[]
+  drawSchedule   Json?          @map("draw_schedule")
   drawFrequency  DrawFrequency @default(AT_CONCLUSION) @map("draw_frequency")
   mechanicType   MechanicType  @default(OTHER) @map("mechanic_type")
   notes          String?
