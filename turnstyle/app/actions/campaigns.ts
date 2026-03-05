@@ -65,7 +65,17 @@ export async function createCampaign(data: {
   const mechanicType = (mechanicTypeMap[data.drawMechanic] ?? 'OTHER') as any
   const campaign = await prisma.campaign.create({
     data: {
-      tsCode: data.tsCode,
+      tsCode: await (async () => {
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+      let code = ''
+      let exists = true
+      while (exists) {
+        code = Array.from({length: 5}, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+        const existing = await prisma.campaign.findFirst({ where: { tsCode: code } })
+        exists = !!existing
+      }
+      return code
+    })(),
       promoterId: promoter.id,
       createdById: adminUser.id,
       name: data.campaignName,
