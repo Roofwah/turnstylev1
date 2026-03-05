@@ -1001,34 +1001,108 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
 )}
 
         {/* ── LOA ── */}
-        {activeTab === 'loa' && (
-          <div className="max-w-2xl">
-            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
-              <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Letter of Authority</h2>
-              <p className="text-white/40 text-sm mb-4">Required for permit applications in NSW, SA, and ACT where prize pool thresholds are met.</p>
-              {(() => {
-                const r = campaign.regions ?? []
-                const prize = prizePoolTotal
-                const permitStates: string[] = []
-                if ((r.includes('national_au') || r.includes('ACT')) && prize > 3000) permitStates.push('ACT')
-                if ((r.includes('national_au') || r.includes('SA')) && prize > 5000) permitStates.push('SA')
-                if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
-                return permitStates.length > 0 ? (
+        {activeTab === 'loa' && (() => {
+          const r = campaign.regions ?? []
+          const prize = prizePoolTotal
+          const permitStates: string[] = []
+          if ((r.includes('national_au') || r.includes('ACT')) && prize > 3000) permitStates.push('ACT')
+          if ((r.includes('national_au') || r.includes('SA')) && prize > 5000) permitStates.push('SA')
+          if ((r.includes('national_au') || r.includes('NSW')) && prize > 10000) permitStates.push('NSW')
+          const loaSigned = campaign.permitLOASigned
+          const allPermitsFilled = permitStates.every(s =>
+            (s === 'NSW' && campaign.permitNSW) || (s === 'SA' && campaign.permitSA) || (s === 'ACT' && campaign.permitACT)
+          )
+          const readyToSchedule = permitStates.length === 0 || (loaSigned && allPermitsFilled)
+          return (
+            <div className="max-w-2xl space-y-4">
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Letter of Authority</h2>
+                    <p className="text-white/40 text-sm">Must be signed before permit applications can be submitted.</p>
+                  </div>
+                  {loaSigned
+                    ? <span className="text-emerald-400 text-xs font-bold px-3 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">✓ Signed</span>
+                    : <span className="text-amber-400 text-xs font-bold px-3 py-1 rounded-full bg-amber-400/10 border border-amber-400/20">⚠ Not Signed</span>
+                  }
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => window.open(`/dashboard/${id}/loa`, '_blank')}
+                    className="bg-white/[0.06] border border-white/[0.10] text-white font-semibold text-sm px-4 py-2 rounded-xl hover:bg-white/10 transition-all">
+                    View / Complete LOA →
+                  </button>
+                  {!loaSigned && (
+                    <button onClick={async () => {
+                      await fetch(`/api/campaigns/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ permitLOASigned: true }) })
+                      setCampaign(prev => prev ? { ...prev, permitLOASigned: true } : prev)
+                    }} className="bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 font-semibold text-sm px-4 py-2 rounded-xl hover:bg-emerald-400/20 transition-all">
+                      Mark as Signed
+                    </button>
+                  )}
+                </div>
+              </div>
+              {permitStates.length > 0 && (
+                <div className={`bg-white/[0.03] border rounded-2xl p-6 ${loaSigned ? 'border-white/[0.06]' : 'border-amber-400/20 opacity-50'}`}>
+                  <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Permit Numbers</h2>
+                  <p className="text-white/40 text-sm mb-4">
+                    {loaSigned ? 'Enter permit numbers as approvals are received from each state.' : 'Complete and sign the LOA before submitting permit applications.'}
+                  </p>
                   <div className="space-y-3">
-                    <p className="text-amber-400 text-sm font-semibold">Permits required: {permitStates.join(', ')}</p>
+                    {permitStates.map(state => {
+                      const value = state === 'NSW' ? campaign.permitNSW : state === 'SA' ? campaign.permitSA : campaign.permitACT
+                      const fieldKey = state === 'NSW' ? 'permitNSW' : state === 'SA' ? 'permitSA' : 'permitACT'
+                      return (
+                        <div key={state} className="flex items-center gap-3">
+                          <span className={`text-xs font-bold px-2 py-1 rounded border w-12 text-center ${
+                            state === 'ACT' ? 'bg-blue-500/15 text-blue-400 border-blue-500/20' :
+                            state === 'SA' ? 'bg-orange-500/15 text-orange-400 border-orange-500/20' :
+                            'bg-emerald-500/15 text-emerald-400 border-emerald-500/20'
+                          }`}>{state}</span>
+                          <input
+                            disabled={!loaSigned}
+                            defaultValue={value ?? ''}
+                            placeholder="Enter permit number..."
+                            className="flex-1 bg-white/[0.05] border border-white/[0.10] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30 disabled:opacity-30"
+                            onBlur={async (e) => {
+                              const val = e.target.value.trim()
+                              await fetch(`/api/campaigns/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [fieldKey]: val || null }) })
+                              setCampaign(prev => prev ? { ...prev, [fieldKey]: val || null } : prev)
+                            }}
+                          />
+                          {value ? <span className="text-emerald-400 text-xs">✓</span> : <span className="text-white/20 text-xs">Pending</span>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+              {campaign.status === 'PENDING' && (
+                <div className={`bg-white/[0.03] border rounded-2xl p-6 ${readyToSchedule ? 'border-emerald-400/20' : 'border-white/[0.06]'}`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-white font-bold text-sm uppercase tracking-widest mb-1 opacity-60">Schedule Campaign</h2>
+                      <p className="text-white/40 text-sm">
+                        {readyToSchedule ? 'All requirements met. Ready to move to Scheduled.' : 'Complete LOA and all permit numbers before scheduling.'}
+                      </p>
+                    </div>
                     <button
-                      onClick={() => window.open(`/dashboard/${id}/loa`, '_blank')}
-                      className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all">
-                      View / Complete LOA →
+                      disabled={!readyToSchedule}
+                      onClick={async () => {
+                        const res = await fetch(`/api/campaigns/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'SCHEDULED', force: true }) })
+                        if (res.ok) {
+                          const updated = await res.json()
+                          setCampaign(prev => prev ? { ...prev, status: updated.status } : prev)
+                        }
+                      }}
+                      className="bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 font-black text-sm px-6 py-2.5 rounded-xl hover:bg-emerald-400/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+                      Move to Scheduled →
                     </button>
                   </div>
-                ) : (
-                  <p className="text-emerald-400 text-sm font-semibold">✓ No permits required for this campaign</p>
-                )
-              })()}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── Draw ── */}
         {activeTab === 'draw' && (

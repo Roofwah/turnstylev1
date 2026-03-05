@@ -53,6 +53,10 @@ export async function PATCH(
       where: { id },
       data: {
         ...(body.drawSchedule !== undefined && { drawSchedule: body.drawSchedule }),
+        ...(body.permitLOASigned !== undefined && { permitLOASigned: body.permitLOASigned }),
+        ...(body.permitNSW !== undefined && { permitNSW: body.permitNSW }),
+        ...(body.permitSA !== undefined && { permitSA: body.permitSA }),
+        ...(body.permitACT !== undefined && { permitACT: body.permitACT }),
       },
     })
     return NextResponse.json(campaign)
