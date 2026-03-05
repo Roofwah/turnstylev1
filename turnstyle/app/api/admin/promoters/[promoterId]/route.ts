@@ -23,7 +23,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ pr
       address:      address?.trim()      || null,
       contactName:  contactName?.trim()  || null,
       contactEmail: contactEmail?.trim() || null,
-      contactPhone: contactPhone?.trim() || null,
     },
   })
   return NextResponse.json(promoter)
