@@ -69,7 +69,21 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any; o
                 + Add Row
               </button>
             )}
-            {dirty && (
+            {process.env.NODE_ENV === 'development' && (
+            <button onClick={async () => {
+              const res = await fetch(`/api/campaigns/${(campaign as any).id}/sync-draws`, { method: 'POST' })
+              const data = await res.json()
+              if (data.schedule) {
+                setSchedule(data.schedule)
+                alert('Synced to PureRandom!')
+              } else {
+                alert('Error: ' + (data.error || 'unknown'))
+              }
+            }} className="bg-amber-400/10 border border-amber-400/20 text-amber-400 text-xs font-semibold px-3 py-2 rounded-xl hover:bg-amber-400/20 transition-all">
+              🔄 Sync to PureRandom
+            </button>
+          )}
+          {dirty && (
               <button onClick={save} disabled={saving} className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-2 rounded-xl hover:bg-white/90 transition-all disabled:opacity-50">
                 {saving ? 'Saving...' : 'Save Schedule'}
               </button>
