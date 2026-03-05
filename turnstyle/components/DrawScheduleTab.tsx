@@ -86,6 +86,7 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any; o
                 {!isSimple && <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Period End</th>}
                 <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Draw Date</th>
                 <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Winners</th>
+                <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Stus</th>
                 {!isSimple && <th className="pb-3"></th>}
               </tr>
             </thead>

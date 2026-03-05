@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { CampaignStatus } from '@prisma/client'
 import { sendCampaignStatusEmail } from '@/lib/email/campaign-notifications'
+import { schedulePurerandomDraw } from '@/lib/purerandom'
 
 const LIFECYCLE_STAGES: CampaignStatus[] = [
   'DRAFT', 'CONFIRMED', 'COMPILED', 'REVIEW', 'PENDING',
@@ -183,6 +184,36 @@ export async function PATCH(
         termsDrafts: { orderBy: { createdAt: 'desc' }, include: { approvals: true } },
       },
     })
+
+    // Schedule draws in PureRandom when campaign moves to SCHEDULED
+    if (newStatus === 'SCHEDULED') {
+      try {
+        const drawSchedule: any[] = (updated as any).drawSchedule || []
+        if (drawSchedule.length > 0) {
+          const updatedSchedule = await Promise.all(drawSchedule.map(async (event: any) => {
+            if (event.purerandomId) return event // already scheduled
+            const result = await schedulePurerandomDraw({
+              promotionName: updated!.name,
+              tsCode: updated!.tsCode,
+              drawName: event.name,
+              drawDate: event.drawDate,
+              drawTime: '10:00',
+              numWinners: event.winners || 1,
+            })
+            if (result) {
+              return { ...event, purerandomId: result.drawId, uploadUrl: result.uploadUrl, scheduled: true }
+            }
+            return event
+          }))
+          await prisma.$executeRawUnsafe(
+            `UPDATE campaigns SET draw_schedule = $1::jsonb WHERE id = $2`,
+            JSON.stringify(updatedSchedule), id
+          )
+        }
+      } catch (scheduleErr) {
+        console.error('PureRandom scheduling error (non-fatal):', scheduleErr)
+      }
+    }
 
     // Send email notification
     try {
