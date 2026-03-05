@@ -24,15 +24,18 @@ export async function createCampaign(data: {
   const prizePoolTotal = data.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
 
   // Create promoter
-  const promoter = await prisma.promoter.create({
-    data: {
-      name: String(data.promoterName).trim(),
-      abn: data.promoterAbn ? String(data.promoterAbn).replace(/\s/g, "").trim() : null,
-      contactName: data.contactName ? String(data.contactName).trim() : null,
-      contactEmail: data.contactEmail ? String(data.contactEmail).trim() : null,
-      address: data.promoterAddress ? String(data.promoterAddress).trim() : null,
-    },
-  })
+  const promoterId = require('crypto').randomUUID()
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO promoters (id, name, abn, contact_name, contact_email, address, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+    promoterId,
+    String(data.promoterName).trim(),
+    data.promoterAbn ? String(data.promoterAbn).replace(/\s/g, '').trim() : null,
+    data.contactName ? String(data.contactName).trim() : null,
+    data.contactEmail ? String(data.contactEmail).trim() : null,
+    data.promoterAddress ? String(data.promoterAddress).trim() : null,
+  )
+  const promoter = { id: promoterId }
 
   // Get or create default admin user
   // Note: This is a temporary solution until real auth is implemented
