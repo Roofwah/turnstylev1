@@ -7,7 +7,7 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-export default function DrawScheduleTab({ campaign, onSave }: { campaign: any; onSave: (schedule: DrawEvent[]) => Promise<void> }) {
+export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & { id: string }; onSave: (schedule: DrawEvent[]) => Promise<void> }) {
   const [schedule, setSchedule] = useState<DrawEvent[]>([])
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -69,9 +69,9 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any; o
                 + Add Row
               </button>
             )}
-            {process.env.NODE_ENV === 'development' && (
+            {(
             <button onClick={async () => {
-              const res = await fetch(`/api/campaigns/${(campaign as any).id}/sync-draws`, { method: 'POST' })
+              const res = await fetch(`/api/campaigns/${campaign.id}/sync-draws`, { method: 'POST' })
               const data = await res.json()
               if (data.schedule) {
                 setSchedule(data.schedule)
