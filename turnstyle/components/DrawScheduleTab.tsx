@@ -100,7 +100,7 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                 {!isSimple && <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Period End</th>}
                 <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Draw Date</th>
                 <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Winners</th>
-                <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Stus</th>
+                <th className="text-white/30 text-xs font-semibold uppercase tracking-widest text-left pb-3 pr-4">Status</th>
                 {!isSimple && <th className="pb-3"></th>}
               </tr>
             </thead>
@@ -135,11 +135,32 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                   </td>
                   <td className="py-3 pr-4">
                     <input type="number" min={1} value={event.winners} onChange={e => updateRow(event.id, 'winners', parseInt(e.target.value))}
-                      className="bg-white/[0.05] border border-white/[0.10] rounded-lg px-2 py-1 text-white text-xs w-16 focus:outline-none focus:border-white/30" />
+                      className="bg-white0.05] border border-white/[0.10] rounded-lg px-2 py-1 text-white text-xs w-16 focus:outline-none focus:border-white/30" />
+                  </td>
+                  <td className="py-3 pr-4">
+                    {(event as any).scheduled ? (
+                      <div className="flex flex-col gap-1">
+                        <span className="text-emerald-400 text-xs font-bold">✓ Scheduled</span>
+                        {(event as any).uploadUrl && (
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText((event as any).uploadUrl)
+                              alert('Upload link copied!')
+                            }}
+                            className="text-xs px-2 py-1 rounded bg-sky-400/10 border border-sky-400/20 text-sky-400 hover:bg-sky-400/20 transition-all text-left">
+                            📋 Copy Upload Link
+                          </button>
+                        )}
+                      </div>
+                ) : (
+                      <span className="text-white/20 text-xs">Pending</span>
+                    )}
                   </td>
                   {!isSimple && (
                     <td className="py-3">
-                      <button onClick={() => removeRow(event.id)} className="text-red-400/50 hover:text-red-400 text-xs transition-colors">✕</button>
+                      {!(event as any).scheduled && (
+                        <button onClick={() => removeRow(event.id)} className="text-red-400/50 hover:text-red-400 text-xs transition-colors">✕</button>
+                      )}
                     </td>
                   )}
                 </tr>
