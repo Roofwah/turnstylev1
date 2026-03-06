@@ -151,8 +151,9 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                             className="text-xs px-2 py-1 rounded bg-sky-400/10 border border-sky-400/20 text-sky-400 hover:bg-sky-400/20 transition-all text-left">
                             Share Upload Link
                           </button>
-                    )}
-                ) : (
+                        )}
+                      </div>
+                    ) : (
                       <span className="text-white/20 text-xs">Pending</span>
                     )}
                   </td>
