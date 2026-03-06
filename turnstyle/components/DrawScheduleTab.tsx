@@ -142,11 +142,21 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                       <div className="flex flex-col gap-1">
                         <span className="text-emerald-400 text-xs font-bold">✓ Scheduled</span>
                         <span className="text-white/40 text-xs">{event.drawDate}</span>
-                        {(event as any).uploadUrl && (
+                        {(event as any).purerandomId && (
                           <button
-                            onClick={() => {
-                              navigator.clipboard.writeText((event as any).uploadUrl)
-                              alert('Copied: ' + (event as any).uploadUrl)
+                            onClick={async () => {
+                              const res = await fetch('/api/purerandom/upload-link', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ drawId: (event as any).purerandomId })
+                              })
+                              const data = await res.json()
+                              if (data.upload_url) {
+                                navigator.clipboard.writeText(data.upload_url)
+                                alert('Upload link copied!\n\n' + data.upload_url + '\n\nExpires: ' + data.expires_at + '\nDeadline: ' + data.cutoff)
+                              } else {
+                                alert('Error: ' + (data.error || 'Could not get link'))
+                              }
                             }}
                             className="text-xs px-2 py-1 rounded bg-sky-400/10 border border-sky-400/20 text-sky-400 hover:bg-sky-400/20 transition-all text-left">
                             Share Upload Link
