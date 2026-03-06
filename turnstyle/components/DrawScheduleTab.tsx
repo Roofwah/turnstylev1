@@ -145,10 +145,7 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                           <button
                             onClick={async () => {
                               try {
-                                const res = await fetch('https://purerandom.turnstylehost.com/api/upload_link/' + (event as any).purerandomId,
-                                  method: 'POST',
-                                  headers: { 'X-Admin-Key': '50d09aac205e525bc5603bd620af8788' }
-                                })
+                                const res = await fetch('https://purerandom.turnstylehost.com/api/upload_link/' + (event as any).purerandomId, { method: 'POST', headers: { 'X-Admin-Key': '50d09aac205e525bc5603bd620af8788' } })
                                 const data = await res.json()
                                 if (data.upload_url) {
                                   navigator.clipboard.writeText(data.upload_url)
