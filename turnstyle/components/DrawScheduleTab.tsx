@@ -141,14 +141,27 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                     {(event as any).scheduled ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-emerald-400 text-xs font-bold">✓ Scheduled</span>
-                        {(event as any).uploadUrl && (
+                        {(event as any).purerandomId && (
                           <button
-                            onClick={() => {
-                              navigator.clipboard.writeText((event as any).uploadUrl)
-                              alert('Upload link copied!')
+                            onClick={async () => {
+                              try {
+                                const res = await fetch('https://purerandom.turnstylehost.com/api/upload_link/' + (event as any).purerandomId,
+                                  method: 'POST',
+                                  headers: { 'X-Admin-Key': '50d09aac205e525bc5603bd620af8788' }
+                                })
+                                const data = await res.json()
+                                if (data.upload_url) {
+                                  navigator.clipboard.writeText(data.upload_url)
+                                  alert('Upload link copied!')
+                                } else {
+                                  alert('Error: ' + (data.error || 'Could not get link'))
+                                }
+                              } catch(e) {
+                                alert('Failed to get upload link')
+                              }
                             }}
                             className="text-xs px-2 py-1 rounded bg-sky-400/10 border border-sky-400/20 text-sky-400 hover:bg-sky-400/20 transition-all text-left">
-                            📋 Copy Upload Link
+                            Share Upload Link
                           </button>
                         )}
                       </div>
