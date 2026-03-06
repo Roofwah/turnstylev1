@@ -141,27 +141,17 @@ export default function DrawScheduleTab({ campaign, onSave }: { campaign: any & 
                     {(event as any).scheduled ? (
                       <div className="flex flex-col gap-1">
                         <span className="text-emerald-400 text-xs font-bold">✓ Scheduled</span>
-                        {(event as any).purerandomId && (
+                        <span className="text-white/40 text-xs">{event.drawDate}</span>
+                        {(event as any).uploadUrl && (
                           <button
-                            onClick={async () => {
-                              try {
-                                const res = await fetch('https://purerandom.turnstylehost.com/api/upload_link/' + (event as any).purerandomId, { method: 'POST', headers: { 'X-Admin-Key': '50d09aac205e525bc5603bd620af8788' } })
-                                const data = await res.json()
-                                if (data.upload_url) {
-                                  navigator.clipboard.writeText(data.upload_url)
-                                  alert('Upload link copied!')
-                                } else {
-                                  alert('Error: ' + (data.error || 'Could not get link'))
-                                }
-                              } catch(e) {
-                                alert('Failed to get upload link')
-                              }
+                            onClick={() => {
+                              navigator.clipboard.writeText((event as any).uploadUrl)
+                              alert('Copied: ' + (event as any).uploadUrl)
                             }}
                             className="text-xs px-2 py-1 rounded bg-sky-400/10 border border-sky-400/20 text-sky-400 hover:bg-sky-400/20 transition-all text-left">
                             Share Upload Link
                           </button>
-                        )}
-                      </div>
+                    )}
                 ) : (
                       <span className="text-white/20 text-xs">Pending</span>
                     )}
