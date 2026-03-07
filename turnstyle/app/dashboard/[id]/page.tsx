@@ -519,7 +519,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
             ) : (
               <div className="text-white font-black text-xl">{m.value}</div>
             )}
-            {m.sub && <div className="text-white/30 text-xs mt-0.5">{m.sub}</div>}
+{(m as any).sub && <div className="text-white/30 text-xs mt-0.5">{(m as any).sub}</div>}
           </div>
         ))}
       </div>
