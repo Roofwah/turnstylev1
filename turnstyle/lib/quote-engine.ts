@@ -13,7 +13,7 @@ export const ENGINE_VERSION = '0.1.5'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type MechanicType = 'sweepstakes' | 'limited' | 'instant_win' | 'other'
+export type MechanicType = 'sweepstakes' | 'limited' | 'instant_win' | 'game_of_skill' | 'other' | 'draw_only'
 export type DrawFrequency =
   | 'at_conclusion'
   | 'daily'
@@ -97,8 +97,10 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
 
   const termsFee  = calcTermsFee(promoType, prizePoolTotal)
   const mgmtFee   = calcMgmtFee(promoType, prizePoolTotal)
-  const permitFee = calcPermitFee(prizePoolTotal)
-  const drawFee   = calcDrawFee(drawCount)
+  const noPermit = ['draw_only', 'limited', 'game_of_skill', 'other'].includes(promoType)
+  const permitFee = noPermit ? 0 : calcPermitFee(prizePoolTotal)
+  const noDrawFee = ['limited', 'game_of_skill', 'other'].includes(promoType)
+  const drawFee   = noDrawFee ? 0 : calcDrawFee(drawCount)
 
   const totalExGst  = termsFee + mgmtFee + permitFee + drawFee
   const gstAmount   = Math.round(totalExGst * 0.1 * 100) / 100
@@ -128,12 +130,12 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
     {
       label:  'Permit Fees (estimate)',
       amount: permitFee,
-      note:   permitFeeNote(prizePoolTotal),
+      note:   permitFeeNote(promoType, prizePoolTotal),
     },
     {
       label:  'Draw Administration',
       amount: drawFee,
-      note:   `${drawCount} draw(s) · frequency: ${input.drawFrequency || 'At conclusion'}`,
+      note:   noDrawFee ? 'Not applicable' : `${drawCount} draw(s) · frequency: ${input.drawFrequency || 'At conclusion'}`,
     },
   ]
 
@@ -182,27 +184,34 @@ const promoTypeLabels: Record<MechanicType, string> = {
   sweepstakes: 'Sweepstakes',
   limited:     'Limited offer',
   instant_win: 'Sweepstakes',  // treated same as sweepstakes for pricing
+  game_of_skill: 'Game of Skill',
   other:       'Other / unsure',
+  draw_only:   'Draw Only',
 }
 
 export function resolvePromoType(drawMechanic: string): MechanicType {
   const m = drawMechanic.toLowerCase()
+  if (m.includes('draw only') || m.includes('draw_only')) return 'draw_only'
   if (m.includes('limited'))    return 'limited'
   if (m.includes('sweep'))      return 'sweepstakes'
   if (m.includes('instant'))    return 'instant_win'
+  if (m.includes('skill'))      return 'game_of_skill'
   return 'other'
 }
 
 // ─── Terms fee ────────────────────────────────────────────────────────────────
 
 export function calcTermsFee(promoType: MechanicType, prizePool: number): number {
-  if (promoType === 'limited') return 250
-  // sweepstakes, instant_win, other all follow same rule
+  if (promoType === 'draw_only') return 0
+  if (promoType === 'limited') return 450
   return prizePool < 10_000 ? 450 : 550
 }
 
 function termsFeeNote(promoType: MechanicType, prizePool: number): string {
   if (promoType === 'limited') return 'Limited offer rate'
+  if (promoType === 'draw_only') return 'Not Applicable'
+  if (promoType === 'game_of_skill') return 'Game of Skill rate'
+  if (promoType === 'other') return 'Other rate'
   return prizePool < 10_000
     ? 'Sweepstakes (< $10k prize pool)'
     : 'Sweepstakes (≥ $10k prize pool)'
@@ -211,7 +220,10 @@ function termsFeeNote(promoType: MechanicType, prizePool: number): string {
 // ─── Management fee ───────────────────────────────────────────────────────────
 
 export function calcMgmtFee(promoType: MechanicType, prizePool: number): number {
-  if (promoType === 'limited') return 150
+  if (promoType === 'draw_only') return 100
+  if (promoType === 'limited') return 100
+  if (promoType === 'game_of_skill') return 100
+  if (promoType === 'other') return 100
   if (prizePool < 5_000)  return 250
   if (prizePool < 10_000) return 450
   return 550
@@ -219,6 +231,9 @@ export function calcMgmtFee(promoType: MechanicType, prizePool: number): number 
 
 function mgmtFeeNote(promoType: MechanicType, prizePool: number): string {
   if (promoType === 'limited') return 'Limited offer management'
+  if (promoType === 'draw_only') return 'Draw Only management'
+  if (promoType === 'game_of_skill') return 'Game of Skill management'
+  if (promoType === 'other') return 'Other management'
   if (prizePool < 5_000)  return 'Sweepstakes (< $5k prize pool)'
   if (prizePool < 10_000) return 'Sweepstakes ($5k – $9,999)'
   return 'Sweepstakes (≥ $10k prize pool)'
@@ -238,7 +253,8 @@ export function calcPermitFee(prizePool: number): number {
   return 11_305
 }
 
-function permitFeeNote(prizePool: number): string {
+function permitFeeNote(promoType: MechanicType, prizePool: number): string {
+  if (['limited', 'game_of_skill', 'other', 'draw_only'].includes(promoType)) return 'Not applicable'
   if (prizePool < 3_000)   return 'Prize pool < $3,000 — no permit required'
   if (prizePool < 5_000)   return '$3,000 – $4,999'
   if (prizePool < 10_000)  return '$5,000 – $9,999'

@@ -10,7 +10,9 @@ import { deleteCampaign } from '@/app/actions/deleteCampaign'
 import DrawScheduleTab from '@/components/DrawScheduleTab'
 import { DrawEvent } from '@/lib/draw-schedule'
 import { confirmQuote } from '@/app/actions/confirmQuote'
-
+import CampaignLifecycleBar from '@/components/CampaignLifecycleBar'
+import PrizeWizardModal from '@/components/PrizeWizardModal'
+import DrawWizardModal from '@/components/DrawWizardModal'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -118,6 +120,7 @@ function normaliseCampaign(raw: any): Campaign {
     tsCode:        raw.tsCode ?? '',
     name:          raw.name ?? '',
     status:        raw.status ?? 'DRAFT',
+    mechanicType:  raw.mechanicType ?? 'OTHER',
     promoter:      raw.promoter ?? null,
     promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
     promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
@@ -125,6 +128,7 @@ function normaliseCampaign(raw: any): Campaign {
                    raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer' :
                    raw.mechanicType === 'INSTANT_WIN' ? 'Instant Win' :
                    raw.mechanicType === 'GAME_OF_SKILL' ? 'Game of Skill' :
+                   raw.mechanicType === 'DRAW_ONLY' ? 'Draw Only' :
                    raw.mechanicType === 'OTHER' ? 'Other' : '',
     drawFrequency: (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('_', '_'),
     entryMechanic: raw.entryMechanic ?? '',
@@ -190,8 +194,11 @@ function CommandCentrePageInner() {
   const [draft, setDraft]             = useState<Campaign | null>(null)
   const [approvalWarning, setApprovalWarning] = useState(false)
   const [saving, setSaving]           = useState(false)
+  const [mobileTabOpen, setMobileTabOpen] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null)
+  const [showPrizeWizard, setShowPrizeWizard] = useState(false)
+const [showDrawWizard, setShowDrawWizard] = useState(false)
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as TabId | null
@@ -484,9 +491,9 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         {[
           { label: 'Prize Pool',  value: formatMoney(prizePoolTotal) },
-          { label: 'Quote Total', value: formatMoney(quote.totalExGst), sub: 'excl GST' },
+          { label: 'Promotion Type', value: campaign.drawMechanic || '—' },
           { label: 'Countdown', value: countdownLabel ?? '—' },
-          { label: 'Final Draw',  value: quote.finalDrawDate },
+          { label: 'Final Draw', value: ['LIMITED_OFFER','GAME_OF_SKILL','OTHER'].includes(campaign.mechanicType) ? '—' : campaign.mechanicType === 'DRAW_ONLY' && campaign.drawSchedule?.[0]?.drawDate ? new Date(campaign.drawSchedule[0].drawDate).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : quote.finalDrawDate },
         ].map(m => (
           <div key={m.label} className={`bg-white/[0.03] border rounded-xl p-4 transition-all ${editing ? 'border-white/[0.10]' : 'border-white/[0.06]'}`}>
             <div className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">{m.label}</div>
@@ -506,8 +513,9 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
       </div>
       <div className="flex items-center gap-2 mb-8 flex-wrap">
 
-        {permitStates.length > 0 && ['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING'].includes(campaign.status) && (() => {
-          const businessDaysUntilStart = (() => {
+       
+       {permitStates.length > 0 && ['SWEEPSTAKES','INSTANT_WIN'].includes(campaign.mechanicType) && ['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING'].includes(campaign.status) && (() => {
+       const businessDaysUntilStart = (() => {
             if (!source.promoStart) return null
             let count = 0
             const d = new Date()
@@ -542,9 +550,9 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                   } else if (days < 5.5) {
                     icon = '❌'; msg = `Too late — starts in ${days} business day${days === 1 ? '' : 's'}`; color = 'text-red-400'
                   } else if (state === 'SA' && days < 10.5) {
-                    icon = '⚠️'; msg = 'Rush only — est. issue ' + estStr; color = 'text-amber-400'
+                    icon = '⚠️'; msg = 'Rush only* · est. issue ' + estStr; color = 'text-amber-400'
                   } else {
-                    icon = '✅'; msg = 'Ready — est. issue ' + estStr + (state === 'SA' ? ' · Rush available' : ''); color = 'text-emerald-400'
+                    icon = '✅'; msg = 'Ready — est. issue ' + estStr + (state === 'SA' ? ' · Rush available*' : ''); color = 'text-emerald-400'
                   }
                   return (
                     <div key={state} className="flex items-center gap-3">
@@ -558,65 +566,116 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
             </div>
           )
         })()}
-        {permitStates.length === 0 && (
-          <span className="text-white/20 text-xs">No permits required</span>
-        )}  <div className="ml-auto">
-        {(() => {
-          const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'ACCEPTED')
-          const isApproved = campaign.status === 'CONFIRMED' || hasApprovedQuote
-          
-          return isApproved ? (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-emerald-400/10 border border-emerald-400/20">
-              <span className="text-emerald-400 text-sm">✓</span>
-              <span className="text-emerald-400 text-xs font-bold">Quote Confirmed</span>
-            </div>
-          ) : (
-            <button
-            onClick={async () => {
-              try {
-                const result = await confirmQuote(id)
-                setConfirmedAt(result.confirmedAt)
-                setCampaign(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
-                setActiveTab('abbr-terms')
-              } catch (error) {
-                alert(error instanceof Error ? error.message : 'Failed to confirm quote')
-              }
-            }}
-              className="bg-white text-[#0a0a0f] font-black text-xs px-4 py-1.5 rounded-md hover:bg-white/90 transition-all">
-              Confirm & Proceed →
-            </button>
-          )
-        })()}
+{permitStates.length === 0 && ['SWEEPSTAKES','LIMITED_OFFER','INSTANT_WIN','GAME_OF_SKILL','DRAW_ONLY'].includes(campaign.mechanicType) && (
+  <span className="text-white/20 text-xs">No permits required</span>
+)}  
+
+
+
+<div className="ml-auto">
+        <div className="shrink-0" onClick={e => e.stopPropagation()}>
+          <CampaignLifecycleBar
+            campaignId={campaign.id}
+            currentStatus={campaign.quotes?.some((q: any) => q.status === 'ACCEPTED') ? 'APPROVED' : (campaign.status ?? 'DRAFT')}
+            campaign={campaign}
+            compact
+          />
+        </div>
       </div>
       </div>
     </>
   )
 })()}
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 mb-6 border-b border-white/[0.06] overflow-x-auto">
-          {([
-            { id: 'overview',   label: 'Overview' },
-            { id: 'quote',      label: 'Quote' },
-            { id: 'terms',      label: 'Terms' },
-            // { id: 'abbr-terms', label: 'Abbr Terms' },
-            { id: 'qr-code',    label: 'QR Code' },
-            { id: 'loa',        label: 'LOA' },
-            { id: 'draw',       label: 'Draw' },
-            { id: 'winners',    label: 'Winners' },
-            { id: 'history',    label: 'History' },
-            { id: 'support',    label: 'Support' },
-          ] as { id: TabId; label: string }[]).map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px ${
-                activeTab === tab.id ? 'text-white border-white' : 'text-white/30 border-transparent hover:text-white/60'
-              }`}>
-              {tab.label}
+    {/* Tabs */}
+    <div className="mb-6">
+         {/* Mobile dropdown */}
+         <div className="md:hidden relative">
+            <button
+              onClick={() => setMobileTabOpen(prev => !prev)}
+            className="w-full bg-lime-400 border border-lime-400 rounded-xl px-4 py-3 text-black text-sm font-semibold focus:outline-none flex items-center justify-between hover:bg-lime-300 transition-all"
+           
+           
+           >
+              <span>{([
+                { id: 'overview', label: 'Overview' },
+                { id: 'quote',    label: 'Quote' },
+                { id: 'prizes',   label: 'Prizes' },
+                { id: 'terms',    label: 'Terms' },
+                { id: 'qr-code',  label: 'QR Code' },
+                { id: 'loa',      label: 'LOA' },
+                { id: 'draw',     label: 'Draw' },
+                { id: 'winners',  label: 'Winners' },
+                { id: 'history',  label: 'History' },
+                { id: 'support',  label: 'Support' },
+              ].find(t => t.id === activeTab)?.label ?? 'Overview')}</span>
+            <span className="text-black/50 text-xs">{mobileTabOpen ? '▲' : '▼'}</span>
+            
+            
+              <span className="text-white/40 text-xs">{mobileTabOpen ? '▲' : '▼'}</span>
+           
+           
+           
             </button>
-          ))}
+            {mobileTabOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0f0f17] border border-white/[0.10] rounded-xl overflow-hidden z-50 shadow-2xl">
+                {([
+                  { id: 'overview', label: 'Overview' },
+                  { id: 'quote',    label: 'Quote' },
+                  { id: 'prizes',   label: 'Prizes' },
+                  { id: 'terms',    label: 'Terms' },
+                  { id: 'qr-code',  label: 'QR Code' },
+                  { id: 'loa',      label: 'LOA' },
+                  { id: 'draw',     label: 'Draw' },
+                  { id: 'winners',  label: 'Winners' },
+                  { id: 'history',  label: 'History' },
+                  { id: 'support',  label: 'Support' },
+                ] as { id: TabId; label: string }[]).map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => { setActiveTab(tab.id); setMobileTabOpen(false) }}
+                    className={`w-full text-left px-4 py-3 text-sm font-semibold transition-all border-b border-white/[0.05] last:border-0 ${
+                            activeTab === tab.id
+                        ? 'text-black bg-lime-400'
+                        : 'text-white/50 hover:text-white hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+            
+          {/* Desktop tab bar */}
+          <div className="hidden md:flex items-center gap-0.5 border-b border-white/[0.06]">
+            {([
+              { id: 'overview', label: 'Overview' },
+              { id: 'quote',    label: 'Quote' },
+              { id: 'prizes',   label: 'Prizes' },
+              { id: 'terms',    label: 'Terms' },
+              { id: 'qr-code',  label: 'QR Code' },
+              { id: 'loa',      label: 'LOA' },
+              { id: 'draw',     label: 'Draw' },
+              { id: 'winners',  label: 'Winners' },
+              { id: 'history',  label: 'History' },
+              { id: 'support',  label: 'Support' },
+            ] as { id: TabId; label: string }[]).map((tab, i, arr) => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px shrink-0 ${
+                activeTab === tab.id
+                    ? 'text-black bg-lime-400 border-lime-400 rounded-t-lg'
+                  : i < arr.findIndex(t => t.id === activeTab)
+                    ? 'text-white/20 border-transparent hover:text-white/50'
+                    : 'text-white/50 border-transparent hover:text-white/80 hover:border-white/30'
+              }`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ── Overview ── */}
+    
         {activeTab === 'overview' && (
           <div className="grid md:grid-cols-2 gap-4">
 
@@ -710,6 +769,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                   { label: 'ABN',     key: 'abn' },
                   { label: 'Contact', key: 'contactName' },
                   { label: 'Email',   key: 'contactEmail' },
+                  { label: 'Address',   key: 'address' },
                 ].map(row => (
                   <div key={row.label} className="flex gap-4 items-start">
                     <span className="text-white/30 text-sm w-32 shrink-0">{row.label}</span>
@@ -817,39 +877,14 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
               </div>
             </div>
             <div className="flex gap-3">
-            {(() => {
-              const hasApprovedQuote = campaign.quotes?.some(q => q.status === 'ACCEPTED')
-              const isApproved = campaign.status === 'CONFIRMED' || hasApprovedQuote
-              const approvedQuote = campaign.quotes?.find(q => q.status === 'ACCEPTED')
-              
-              return isApproved ? (
-                <div className="flex-1 bg-emerald-400/10 border border-emerald-400/20 rounded-xl py-3 px-4 flex items-center gap-2">
-                  <span className="text-emerald-400 text-lg">✓</span>
-                  <div>
-                    <div className="text-emerald-400 font-black text-sm">Quote Confirmed</div>
-                    {(confirmedAt || approvedQuote?.approvedAt) && (
-                      <div className="text-emerald-400/60 text-xs">
-                        {new Date(confirmedAt || approvedQuote?.approvedAt || '').toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={async () => {
-                    try {
-                      const result = await confirmQuote(id)
-                      setConfirmedAt(result.confirmedAt)
-                      setCampaign(prev => prev ? { ...prev, status: 'APPROVED' } : prev)
-                    } catch (error) {
-                      alert(error instanceof Error ? error.message : 'Failed to confirm quote')
-                    }
-                  }}
-                  className="flex-1 bg-white text-[#0a0a0f] font-black text-sm py-3 rounded-xl hover:bg-white/90 transition-all">
-                  Confirm & Proceed →
-                </button>
-              )
-            })()}
+            <div className="shrink-0" onClick={e => e.stopPropagation()}>
+              <CampaignLifecycleBar
+                campaignId={campaign.id}
+                currentStatus={campaign.quotes?.some((q: any) => q.status === 'ACCEPTED') ? 'APPROVED' : (campaign.status ?? 'DRAFT')}
+                campaign={campaign}
+                compact
+              />
+            </div>
               
               
               
@@ -869,7 +904,59 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
             </div>
           </div>
         )}
-
+{/* ── Tab: Prizes ── */}
+{activeTab === 'prizes' && (
+         <div className="max-w-2xl space-y-4">
+           {campaign.prizesConfirmed ? (
+             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+               <div className="flex items-center justify-between mb-4">
+                 <div>
+                   <h2 className="text-white font-bold text-sm uppercase tracking-widest opacity-60">Confirmed Prizes</h2>
+                   <p className="text-emerald-400 text-xs mt-0.5">✓ Prize structure locked</p>
+                 </div>
+                 <button onClick={() => setShowPrizeWizard(true)}
+                   className="bg-white/[0.05] border border-white/[0.10] text-white/60 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-white/[0.08] transition-all">
+                   Edit Prizes
+                 </button>
+               </div>
+               <div className="space-y-2">
+                 <div className="grid grid-cols-12 gap-2 px-1 mb-1">
+                   <div className="col-span-1 text-white/30 text-xs uppercase tracking-widest">Tier</div>
+                   <div className="col-span-5 text-white/30 text-xs uppercase tracking-widest">Description</div>
+                   <div className="col-span-2 text-white/30 text-xs uppercase tracking-widest">Qty</div>
+                   <div className="col-span-2 text-white/30 text-xs uppercase tracking-widest">Unit Value</div>
+                   <div className="col-span-2 text-white/30 text-xs uppercase tracking-widest">Subtotal</div>
+                 </div>
+                 {(( campaign.confirmedPrizes ?? []).length > 0 ? (campaign.confirmedPrizes ?? []) : campaign.prizes).map((p: any, i: number) => (         
+                   <div key={i} className="grid grid-cols-12 gap-2 items-center bg-white/[0.02] border border-white/[0.06] rounded-xl px-3 py-2.5">
+                     <div className="col-span-1 text-white/60 text-xs font-bold">{p.tier}</div>
+                     <div className="col-span-5 text-white text-sm">{p.description}</div>
+                     <div className="col-span-2 text-white/60 text-sm">{p.qty}</div>
+                     <div className="col-span-2 text-white/60 text-sm">${Number(p.unitValue).toLocaleString()}</div>
+                     <div className="col-span-2 text-white text-sm font-semibold">${(p.qty * p.unitValue).toLocaleString()}</div>
+                   </div>
+                 ))}
+                 <div className="flex justify-end pt-2 border-t border-white/[0.06] mt-2">
+                   <div className="text-right">
+                     <div className="text-white/40 text-xs">Total Prize Pool</div>
+                     <div className="text-white font-black text-xl">{formatMoney(campaign.prizePoolTotal)}</div>
+                   </div>
+                 </div>
+               </div>
+             </div>
+           ) : (
+             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+               <div className="text-4xl mb-3">🏆</div>
+               <h2 className="text-white font-bold text-lg mb-1">Prize Structure</h2>
+               <p className="text-white/40 text-sm mb-6">Confirm and lock the prizes for this campaign before building terms.</p>
+               <button onClick={() => setShowPrizeWizard(true)}
+                 className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-all">
+                 Open Prize Wizard →
+               </button>
+             </div>
+           )}
+         </div>
+       )}
        {/* ── Tab: Terms ── */}
        {activeTab === 'terms' && (
   <div className="max-w-2xl space-y-4">
@@ -1126,10 +1213,56 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
 
         {/* ── Draw ── */}
         {activeTab === 'draw' && (
-          <DrawScheduleTab campaign={campaign} onSave={async (schedule: DrawEvent[]) => {
-            await fetch(`/api/campaigns/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drawSchedule: schedule }) })
-            setCampaign(prev => prev ? { ...prev, drawSchedule: schedule } : prev)
-          }} />
+          <div className="max-w-2xl space-y-4">
+            {campaign.drawConfirmed ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-white font-bold text-sm uppercase tracking-widest opacity-60">Draw Schedule</h2>
+                    <p className="text-emerald-400 text-xs mt-0.5">✓ Draw schedule locked</p>
+                  </div>
+                  <button onClick={() => setShowDrawWizard(true)}
+                    className="bg-white/[0.05] border border-white/[0.10] text-white/60 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-white/[0.08] transition-all">
+                    Edit Draw Schedule
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {(campaign.drawSchedule ?? []).map((draw: any, i: number) => (
+                    <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-semibold text-sm">{draw.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                            draw.type === 'major' ? 'bg-white/10 border-white/20 text-white/60' :
+                            draw.type === 'minor' ? 'bg-blue-400/10 border-blue-400/20 text-blue-400' :
+                            'bg-purple-400/10 border-purple-400/20 text-purple-400'
+                          }`}>{draw.type}</span>
+                        </div>
+                        <span className="text-white/40 text-xs">{draw.drawDate} {draw.drawTime}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {(draw.prizes ?? []).map((p: any, pi: number) => (
+                          <span key={pi} className="text-white/40 text-xs bg-white/[0.04] border border-white/[0.06] rounded-md px-2 py-1">
+                            {p.qty}× {p.description}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-8 text-center">
+                <div className="text-4xl mb-3">📅</div>
+                <h2 className="text-white font-bold text-lg mb-1">Draw Schedule</h2>
+                <p className="text-white/40 text-sm mb-6">Set draw dates, allocate prizes and lock the schedule before building terms.</p>
+                <button onClick={() => setShowDrawWizard(true)}
+                  className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-all">
+                  Open Draw Wizard →
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* ── Winners ── */}
@@ -1208,7 +1341,39 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
             )}
           </div>
         )}
+{/* ── Prize Wizard Modal ── */}
+{showPrizeWizard && (
+         <PrizeWizardModal
+           campaignId={campaign.id}
+           existingPrizes={(campaign.confirmedPrizes ?? []).length > 0 ? (campaign.confirmedPrizes ?? []) : campaign.prizes}
+           originalPrizePoolTotal={campaign.prizePoolTotal}
+           onConfirm={(prizes) => {
+             setCampaign(prev => prev ? { ...prev, confirmedPrizes: prizes, prizesConfirmed: true, prizePoolTotal: prizes.reduce((s, p) => s + p.qty * p.unitValue, 0) } : prev)
+             setShowPrizeWizard(false)
+           }}
+           onClose={() => setShowPrizeWizard(false)}
+         />
+       )}
 
+       {/* ── Draw Wizard Modal ── */}
+       {showDrawWizard && (
+         <DrawWizardModal
+           campaignId={campaign.id}
+           campaignName={campaign.name}
+           tsCode={campaign.tsCode}
+           promoStart={campaign.promoStart}
+           promoEnd={campaign.promoEnd}
+           confirmedPrizes={(campaign.confirmedPrizes ?? []).length > 0 ? (campaign.confirmedPrizes ?? []) : campaign.prizes}
+           existingDrawSchedule={campaign.drawSchedule}
+           originalDrawFee={275}
+           mechanicType={campaign.mechanicType}
+           onConfirm={(schedule) => {
+             setCampaign(prev => prev ? { ...prev, drawSchedule: schedule, drawConfirmed: true } : prev)
+             setShowDrawWizard(false)
+           }}
+           onClose={() => setShowDrawWizard(false)}
+         />
+       )}
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
@@ -1232,6 +1397,10 @@ export default function CommandCentrePage() {
     <Suspense fallback={
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
         <div className="text-white/30 text-sm">Loading...</div>
+      
+      
+      
+      
       </div>
     }>
       <CommandCentrePageInner />

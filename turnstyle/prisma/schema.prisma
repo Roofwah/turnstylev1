@@ -84,6 +84,9 @@ model Campaign {
   threadMessageId       String?        @map("thread_message_id")
   createdAt      DateTime       @default(now()) @map("created_at")
   updatedAt      DateTime       @updatedAt @map("updated_at")
+  prizesConfirmed    Boolean   @default(false) @map("prizes_confirmed")
+  drawConfirmed      Boolean   @default(false) @map("draw_confirmed")
+  confirmedPrizes    Json?     @map("confirmed_prizes")
 
   promoter      Promoter?           @relation(fields: [promoterId], references: [id])
   createdBy     User                @relation(fields: [createdById], references: [id])
@@ -122,6 +125,7 @@ enum MechanicType {
   INSTANT_WIN
   GAME_OF_SKILL
   OTHER
+  DRAW_ONLY
 }
 
 enum DrawFrequency {

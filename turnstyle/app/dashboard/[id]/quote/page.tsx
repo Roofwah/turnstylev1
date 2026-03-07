@@ -39,8 +39,11 @@ function normaliseCampaign(raw: any) {
     promoStart:    raw.promoStart ? new Date(raw.promoStart).toISOString().split('T')[0] : '',
     promoEnd:      raw.promoEnd   ? new Date(raw.promoEnd).toISOString().split('T')[0]   : '',
     drawMechanic:  raw.mechanicType === 'SWEEPSTAKES'    ? 'Sweepstakes - Random Draw'
-                 : raw.mechanicType === 'LIMITED_OFFER'  ? 'Limited Offer'
-                 : raw.drawMechanic ?? 'Other',
+             : raw.mechanicType === 'LIMITED_OFFER'  ? 'Limited Offer'
+             : raw.mechanicType === 'INSTANT_WIN'    ? 'Instant Win'
+             : raw.mechanicType === 'GAME_OF_SKILL'  ? 'Game of Skill'
+             : raw.mechanicType === 'DRAW_ONLY'      ? 'Draw Only'
+             : raw.drawMechanic ?? 'Other',
     drawFrequency: (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('_', '_'),
     entryMechanic: raw.entryMechanic ?? '',
     regions:       raw.regions ?? [],

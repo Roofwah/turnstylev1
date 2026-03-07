@@ -38,6 +38,10 @@ export default function CampaignCard({
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${status.color} ${status.bg}`}>{status.label}</span>
           </div>
           <h2 className="text-white font-bold text-lg leading-tight mb-0.5">{campaign.name}</h2>
+          <div>
+              <span className="text-white/30 text-sm">Type : </span>
+              <span className="text-white/90 text-base font-semibold">{campaign.mechanicType === 'SWEEPSTAKES' ? 'Sweepstakes' : campaign.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer' : campaign.mechanicType === 'INSTANT_WIN' ? 'Instant Win' : campaign.mechanicType === 'GAME_OF_SKILL' ? 'Game of Skill' : campaign.mechanicType === 'DRAW_ONLY' ? 'Draw Only' : 'Other'}</span>
+            </div>
           <p className="text-white/40 text-sm">{campaign.promoter?.name ?? '—'}</p>
         </Link>
 

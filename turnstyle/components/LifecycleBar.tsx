@@ -38,6 +38,8 @@ interface LifecycleBarProps {
   onShare?: () => void
   onDownload?: () => void
   onApproveQuote?: () => void
+  onPrizeWizard?: () => void
+  onDrawWizard?: () => void
   disabled?: boolean
   isPrerequisiteMet?: boolean
   prerequisiteMessage?: string
@@ -52,12 +54,15 @@ export default function LifecycleBar({
   onShare,
   onDownload,
   onApproveQuote,
+  onPrizeWizard,
+  onDrawWizard,
   disabled = false,
   isPrerequisiteMet = true,
   prerequisiteMessage,
   compact = false,
   hideButton = false,
 }: LifecycleBarProps) {
+
   const router = useRouter()
   const currentIndex = LIFECYCLE_STAGES.indexOf(currentStatus as LifecycleStage)
   const validIndex = currentIndex >= 0 ? currentIndex : 0
@@ -69,7 +74,11 @@ export default function LifecycleBar({
   const handleNextStep = (e?: React.MouseEvent) => {
     if (e) { e.preventDefault(); e.stopPropagation() }
     if (!nextStepConfig || disabled) return
-    if (nextStepConfig.type === 'advance' && nextStage && onAdvance) {
+    if (nextStepConfig.type === 'prize-wizard' && onPrizeWizard) {
+      onPrizeWizard()
+    } else if (nextStepConfig.type === 'draw-wizard' && onDrawWizard) {
+      onDrawWizard()
+    } else if (nextStepConfig.type === 'advance' && nextStage && onAdvance) {
       if (nextStepConfig.requiresConfirmation) {
         if (window.confirm(`Are you sure you want to mark this campaign as ${nextStage}?`)) onAdvance(nextStage)
       } else {

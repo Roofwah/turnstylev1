@@ -12,6 +12,8 @@ interface CampaignLifecycleBarProps {
   currentStatus: string
   campaign?: any
   onStatusUpdated?: (newStatus: string) => void
+  onPrizeWizard?: () => void
+  onDrawWizard?: () => void
   compact?: boolean
   hideButton?: boolean
 }
@@ -21,6 +23,8 @@ export default function CampaignLifecycleBar({
   currentStatus,
   campaign: campaignProp,
   onStatusUpdated,
+  onPrizeWizard,
+  onDrawWizard,
   compact = false,
   hideButton = false,
 }: CampaignLifecycleBarProps) {
@@ -130,6 +134,8 @@ export default function CampaignLifecycleBar({
       onShare={handleShare}
       onDownload={handleDownload}
       onApproveQuote={handleApproveQuote}
+      onPrizeWizard={onPrizeWizard}
+      onDrawWizard={onDrawWizard}
       disabled={isUpdating}
       isPrerequisiteMet={isPrerequisiteMet}
       prerequisiteMessage={prerequisiteMessage}

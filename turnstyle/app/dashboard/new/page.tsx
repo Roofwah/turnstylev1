@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { calculateQuote } from '@/lib/quote-engine'
-import { createCampaign } from '@/app/actions/campaigns'
+import { calculateQuote, calcDrawFee } from '@/lib/quote-engine'
+import { createCampaign, createDrawOnlyCampaign } from '@/app/actions/campaigns'
 import { searchPromoters, type PromoterRecord } from '@/lib/promoter-lookup'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -34,6 +34,18 @@ interface FormData {
   prizes: PrizeTier[]
 }
 
+interface DrawOnlyData {
+  promoterName: string
+  promoterAbn: string
+  contactName: string
+  contactEmail: string
+  promoterAddress: string
+  campaignName: string
+  drawDate: string
+  drawTime: string
+  prizes: PrizeTier[]
+}
+
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'TAS', 'NT']
 
 const MECHANIC_OPTIONS = [
@@ -52,12 +64,22 @@ const FREQUENCY_OPTIONS = [
   { value: 'monthly',       label: 'Monthly' },
 ]
 
+// Draw frequency only shown for Sweepstakes
+const DRAW_FREQUENCY_MECHANICS = ['Sweepstakes']
+
 const STEPS = [
   { id: 1, label: 'Promoter' },
   { id: 2, label: 'Campaign' },
   { id: 3, label: 'Mechanic' },
   { id: 4, label: 'Prizes' },
   { id: 5, label: 'Review' },
+]
+
+const DRAW_ONLY_STEPS = [
+  { id: 1, label: 'Promoter' },
+  { id: 2, label: 'Campaign' },
+  { id: 3, label: 'Prizes' },
+  { id: 4, label: 'Review' },
 ]
 
 const EMPTY_PRIZE: PrizeTier = { tier: '', description: '', qty: 1, unitValue: 0 }
@@ -76,13 +98,13 @@ function Label({ children }: { children: React.ReactNode }) {
   )
 }
 
-function Input({ value, onChange, placeholder, type = 'text', required }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean
+function Input({ value, onChange, placeholder, type = 'text', required, min }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; required?: boolean; min?: string
 }) {
   return (
     <input
       type={type} value={value} onChange={e => onChange(e.target.value)}
-      placeholder={placeholder} required={required}
+      placeholder={placeholder} required={required} min={min}
       className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white placeholder-white/20 text-sm focus:outline-none focus:border-white/30 focus:bg-white/[0.07] transition-all"
     />
   )
@@ -139,12 +161,46 @@ function RegionBtn({ active, onClick, children, future = false }: {
   )
 }
 
+// ─── Draw Only Modal ──────────────────────────────────────────────────────────
+
+function DrawOnlyModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+      <div className="bg-[#12121a] border border-white/[0.10] rounded-2xl p-8 max-w-md w-full shadow-2xl">
+        <div className="text-center mb-6">
+          <div className="text-4xl mb-4">📋</div>
+          <h2 className="text-white font-black text-xl mb-2">Draw Only Campaign</h2>
+          <p className="text-white/50 text-sm leading-relaxed">
+            Do you already have your own Terms & Conditions and the applicable State permit numbers for this promotion?
+          </p>
+        </div>
+        <div className="space-y-3">
+          <button
+            onClick={onConfirm}
+            className="w-full bg-white text-[#0a0a0f] font-black text-sm px-6 py-3.5 rounded-xl hover:bg-white/90 transition-all"
+          >
+            Yes — I have my T&Cs and permits
+          </button>
+          <button
+            onClick={onCancel}
+            className="w-full bg-white/[0.05] border border-white/[0.10] text-white/60 font-semibold text-sm px-6 py-3.5 rounded-xl hover:bg-white/[0.08] hover:text-white transition-all"
+          >
+            No — I need Turnstyle to manage this
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function BuildFormPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
+  const [showDrawOnlyModal, setShowDrawOnlyModal] = useState(false)
+  const [isDrawOnly, setIsDrawOnly] = useState(false)
   const [promoterSuggestions, setPromoterSuggestions] = useState<PromoterRecord[]>([])
   const [promoterLocked, setPromoterLocked] = useState(false)
 
@@ -156,8 +212,18 @@ export default function BuildFormPage() {
     prizes: [{ ...EMPTY_PRIZE, tier: '1st' }],
   })
 
+  const [drawOnly, setDrawOnly] = useState<DrawOnlyData>({
+    promoterName: '', promoterAbn: '', contactName: '', contactEmail: '', promoterAddress: '',
+    campaignName: '', drawDate: '', drawTime: '',
+    prizes: [{ ...EMPTY_PRIZE, tier: '1st' }],
+  })
+
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
+  }
+
+  function setDO<K extends keyof DrawOnlyData>(key: K, value: DrawOnlyData[K]) {
+    setDrawOnly(prev => ({ ...prev, [key]: value }))
   }
 
   function handleCampaignNameChange(name: string) {
@@ -165,6 +231,36 @@ export default function BuildFormPage() {
     if (form.tsCode === '' || form.tsCode === generateTsCode(form.campaignName)) {
       set('tsCode', generateTsCode(name))
     }
+  }
+
+  // ── Draw Only confirmation ──
+  function confirmDrawOnly() {
+    setShowDrawOnlyModal(false)
+    setIsDrawOnly(true)
+    // Pre-fill draw only form with promoter data already entered
+    setDrawOnly(prev => ({
+      ...prev,
+      promoterName: form.promoterName,
+      promoterAbn: form.promoterAbn,
+      contactName: form.contactName,
+      contactEmail: form.contactEmail,
+      promoterAddress: form.promoterAddress,
+      campaignName: form.campaignName,
+    }))
+    // Stay on step 2 to enter draw date and time
+  }
+
+  function cancelDrawOnly() {
+    setShowDrawOnlyModal(false)
+    setIsDrawOnly(false)
+  }
+
+  // ── Validate draw date/time is at least 60 mins from now ──
+  function drawDateTimeValid(): boolean {
+    if (!drawOnly.drawDate || !drawOnly.drawTime) return false
+    const dt = new Date(`${drawOnly.drawDate}T${drawOnly.drawTime}:00`)
+    const minTime = new Date(Date.now() + 60 * 60 * 1000)
+    return dt >= minTime
   }
 
   // ── Region helpers ──
@@ -201,21 +297,31 @@ export default function BuildFormPage() {
     )
   }
 
-  // ── Prize helpers ──
+  // ── Prize helpers (standard) ──
   function updatePrize(index: number, field: keyof PrizeTier, value: string | number) {
     set('prizes', form.prizes.map((p, i) => i === index ? { ...p, [field]: value } : p))
   }
-
   function addPrize() {
     const tiers = ['1st', '2nd', '3rd', '4th', '5th']
     set('prizes', [...form.prizes, { ...EMPTY_PRIZE, tier: tiers[form.prizes.length] ?? '' }])
   }
-
   function removePrize(index: number) {
     set('prizes', form.prizes.filter((_, i) => i !== index))
   }
 
-  // ── Live quote ──
+  // ── Prize helpers (draw only) ──
+  function updateDOPrize(index: number, field: keyof PrizeTier, value: string | number) {
+    setDrawOnly(prev => ({ ...prev, prizes: prev.prizes.map((p, i) => i === index ? { ...p, [field]: value } : p) }))
+  }
+  function addDOPrize() {
+    const tiers = ['1st', '2nd', '3rd', '4th', '5th']
+    setDrawOnly(prev => ({ ...prev, prizes: [...prev.prizes, { ...EMPTY_PRIZE, tier: tiers[prev.prizes.length] ?? '' }] }))
+  }
+  function removeDOPrize(index: number) {
+    setDrawOnly(prev => ({ ...prev, prizes: prev.prizes.filter((_, i) => i !== index) }))
+  }
+
+  // ── Live quote (standard) ──
   const prizePoolTotal = form.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
   const hasQuoteInputs  = form.promoStart && form.promoEnd && form.drawMechanic
   const quote = hasQuoteInputs ? calculateQuote({
@@ -224,7 +330,24 @@ export default function BuildFormPage() {
     drawMechanic: form.drawMechanic, drawFrequency: form.drawFrequency, prizes: form.prizes,
   }) : null
 
+  // ── Draw Only quote ──
+  const doPrizePoolTotal = drawOnly.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
+  const doDrawFee = calcDrawFee(1) // single draw
+  const doCampaignMgmtFee = 100
+  const doTotalExGst = doCampaignMgmtFee + doDrawFee
+  const doGst = Math.round(doTotalExGst * 0.1 * 100) / 100
+  const doTotalIncGst = doTotalExGst + doGst
+
+  // ── Show Draw Frequency only for Sweepstakes ──
+  const showDrawFrequency = DRAW_FREQUENCY_MECHANICS.includes(form.drawMechanic)
+
   function canProceed(): boolean {
+    if (isDrawOnly) {
+      if (step === 1) return !!(form.promoterName && form.contactName && form.contactEmail)
+      if (step === 2) return !!(form.campaignName && drawOnly.drawDate && drawOnly.drawTime && drawDateTimeValid())
+      if (step === 3) return drawOnly.prizes.length > 0 && drawOnly.prizes.every(p => p.description && p.qty > 0 && p.unitValue > 0)
+      return true
+    }
     if (step === 1) return !!(form.promoterName && form.contactName && form.contactEmail)
     if (step === 2) return !!(form.campaignName && form.promoStart && form.promoEnd)
     if (step === 3) return !!(form.drawMechanic && form.regions.length > 0)
@@ -234,7 +357,19 @@ export default function BuildFormPage() {
 
   async function handleSubmit() {
     setSaving(true)
-    await createCampaign(form)
+    if (isDrawOnly) {
+      await createDrawOnlyCampaign({
+        ...drawOnly,
+        promoterName: form.promoterName,
+        promoterAbn: form.promoterAbn,
+        contactName: form.contactName,
+        contactEmail: form.contactEmail,
+        promoterAddress: form.promoterAddress,
+        campaignName: form.campaignName,
+      })
+    } else {
+      await createCampaign(form)
+    }
   }
 
   function formatMoney(n: number) {
@@ -251,29 +386,45 @@ export default function BuildFormPage() {
     return parts.join(' · ') || '—'
   }
 
+  const activeSteps = isDrawOnly ? DRAW_ONLY_STEPS : STEPS
+  const maxStep = activeSteps.length
+
+  // ── Handle step 2 Next in draw only mode ──
+  function handleNext() {
+    setStep(s => s + 1)
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
       <div className="fixed inset-0 opacity-[0.02] pointer-events-none"
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }}
       />
 
+      {/* Draw Only Modal */}
+      {showDrawOnlyModal && (
+        <DrawOnlyModal onConfirm={confirmDrawOnly} onCancel={cancelDrawOnly} />
+      )}
+
       {/* Nav */}
       <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
-      <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-6">
-  <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
-  <div className="flex items-center gap-4">
-    <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">← Campaigns</Link>
-    <span className="text-white/20">/</span>
-    <span className="text-white text-sm font-semibold">New Campaign</span>
-  </div>
-</div>
+        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-6">
+          <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard" className="text-white/40 hover:text-white transition-colors text-sm">← Campaigns</Link>
+            <span className="text-white/20">/</span>
+            <span className="text-white text-sm font-semibold">New Campaign</span>
+            {isDrawOnly && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-sky-400/10 border border-sky-400/20 text-sky-400 font-bold">Draw Only</span>
+            )}
+          </div>
+        </div>
       </nav>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
 
         {/* Step indicator */}
         <div className="flex items-center gap-0 mb-10">
-          {STEPS.map((s, i) => (
+          {activeSteps.map((s, i) => (
             <div key={s.id} className="flex items-center flex-1 last:flex-none">
               <div className="flex flex-col items-center">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all ${
@@ -285,14 +436,14 @@ export default function BuildFormPage() {
                   {s.label}
                 </span>
               </div>
-              {i < STEPS.length - 1 && (
+              {i < activeSteps.length - 1 && (
                 <div className={`flex-1 h-px mx-2 mb-5 transition-all ${step > s.id ? 'bg-emerald-400/40' : 'bg-white/10'}`} />
               )}
             </div>
           ))}
         </div>
 
-        {/* ── Step 1: Promoter ── */}
+        {/* ── Step 1: Promoter (shared) ── */}
         {step === 1 && (
           <div className="space-y-5">
             <div>
@@ -326,8 +477,14 @@ export default function BuildFormPage() {
                   </div>
                 )}
               </div>
-              <div><Label>ABN {!promoterLocked && <span className="text-amber-400/70 normal-case font-normal">(auto-filled when promoter selected)</span>}</Label><Input value={form.promoterAbn} onChange={v => set('promoterAbn', v)} placeholder="e.g. 26 004 139 397" /></div>
-              <div><Label>Address</Label><Input value={form.promoterAddress} onChange={v => set('promoterAddress', v)} placeholder="e.g. 22 Enterprise Drive, Rowville VIC 3178" /></div>
+              <div>
+                <Label>ABN {!promoterLocked && <span className="text-amber-400/70 normal-case font-normal">(auto-filled when promoter selected)</span>}</Label>
+                <Input value={form.promoterAbn} onChange={v => set('promoterAbn', v)} placeholder="e.g. 26 004 139 397" />
+              </div>
+              <div>
+                <Label>Address</Label>
+                <Input value={form.promoterAddress} onChange={v => set('promoterAddress', v)} placeholder="e.g. 22 Enterprise Drive, Rowville VIC 3178" />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div><Label>Contact Name *</Label><Input value={form.contactName} onChange={v => set('contactName', v)} placeholder="Full name" required /></div>
               </div>
@@ -336,58 +493,128 @@ export default function BuildFormPage() {
           </div>
         )}
 
-        {/* ── Step 2: Campaign ── */}
+        {/* ── Step 2: Campaign (shared — draw only adds draw date/time) ── */}
         {step === 2 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Campaign details</h2>
-              <p className="text-white/40 text-sm">Name your campaign and set the dates.</p>
+              <p className="text-white/40 text-sm">
+                {isDrawOnly ? 'Name your draw and set the draw date and time.' : 'Name your campaign and set the dates.'}
+              </p>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-              <div><Label>Campaign Name *</Label><Input value={form.campaignName} onChange={handleCampaignNameChange} placeholder="e.g. Summer Promo 2026" required /></div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Promotion Start *</Label>
-                  <input type="date" value={form.promoStart} min={new Date().toISOString().split('T')[0]}
-                    onChange={e => { set('promoStart', e.target.value); if (form.promoEnd && e.target.value > form.promoEnd) set('promoEnd', '') }}
-                    required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
-                </div>
-                <div>
-                  <Label>Promotion End *</Label>
-                  <input type="date" value={form.promoEnd} min={form.promoStart || new Date().toISOString().split('T')[0]}
-                    onChange={e => set('promoEnd', e.target.value)}
-                    required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
+              <div>
+                <Label>Campaign Name *</Label>
+                <Input value={form.campaignName} onChange={handleCampaignNameChange} placeholder="e.g. Summer Promo 2026" required />
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => isDrawOnly ? setIsDrawOnly(false) : setShowDrawOnlyModal(true)}
+                    className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${isDrawOnly ? 'bg-white/40' : 'bg-white/10'}`}
+                  >
+                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white/60 transition-transform ${isDrawOnly ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
+                  </button>
+                  <span className="text-white/25 text-xs">Draw Only</span>
+                  {isDrawOnly && <span className="text-white/35 text-xs">· start/end dates not required</span>}
                 </div>
               </div>
-              <div><Label>Notes</Label><Textarea value={form.notes} onChange={v => set('notes', v)} placeholder="Any special requirements..." /></div>
+
+              {!isDrawOnly && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Promotion Start *</Label>
+                      <input type="date" value={form.promoStart} min={new Date().toISOString().split('T')[0]}
+                        onChange={e => { set('promoStart', e.target.value); if (form.promoEnd && e.target.value > form.promoEnd) set('promoEnd', '') }}
+                        required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
+                    </div>
+                    <div>
+                      <Label>Promotion End *</Label>
+                      <input type="date" value={form.promoEnd} min={form.promoStart || new Date().toISOString().split('T')[0]}
+                        onChange={e => set('promoEnd', e.target.value)}
+                        required className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all" />
+                    </div>
+                  </div>
+                  <div><Label>Notes</Label><Textarea value={form.notes} onChange={v => set('notes', v)} placeholder="Any special requirements..." /></div>
+                </>
+              )}
+
+              {isDrawOnly && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Draw Date *</Label>
+                      <input type="date"
+                        value={drawOnly.drawDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={e => setDO('drawDate', e.target.value)}
+                        required
+                        className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <Label>Draw Time *</Label>
+                      <input type="time"
+                        value={drawOnly.drawTime}
+                        onChange={e => setDO('drawTime', e.target.value)}
+                        required
+                        className="w-full bg-white/[0.05] border border-white/[0.10] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                  {drawOnly.drawDate && drawOnly.drawTime && !drawDateTimeValid() && (
+                    <p className="text-amber-400 text-xs">⚠ Draw must be scheduled at least 60 minutes from now.</p>
+                  )}
+                  <div className="bg-sky-400/5 border border-sky-400/20 rounded-xl px-4 py-3">
+                    <p className="text-sky-400/80 text-xs">Promotion Type: <span className="font-bold text-sky-400">Sweepstakes</span> · Draw Administration: <span className="font-bold text-sky-400">PureRandom</span></p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
 
-        {/* ── Step 3: Mechanic ── */}
-        {step === 3 && (
+        {/* ── Step 3: Mechanic (standard only) ── */}
+        {step === 3 && !isDrawOnly && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Promotion mechanic</h2>
               <p className="text-white/40 text-sm">How will winners be selected?</p>
             </div>
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-4">
-              <div><Label>Promotion Type *</Label><Select value={form.drawMechanic} onChange={v => set('drawMechanic', v)} options={MECHANIC_OPTIONS} /></div>
-              <div><Label>Draw Frequency</Label><Select value={form.drawFrequency} onChange={v => set('drawFrequency', v)} options={FREQUENCY_OPTIONS} /></div>
-              <div><Label>Entry Method</Label><Select value={form.entryMechanic} onChange={v => set('entryMechanic', v)} options={[
-  { value: 'Account Based Purchases', label: 'Account Based Purchases' },
-  { value: 'Purchase & Show Loyalty Card', label: 'Purchase & Show Loyalty Card' },
-  { value: 'Online - Purchase Required', label: 'Online - Purchase Required' },
-  { value: 'Online - No Purchase', label: 'Online - No Purchase' },
-  { value: 'Other', label: 'Other' },
-]} /></div>
+              <div>
+                <Label>Promotion Type *</Label>
+                <Select value={form.drawMechanic} onChange={v => {
+                  set('drawMechanic', v)
+                  if (!DRAW_FREQUENCY_MECHANICS.includes(v)) {
+                    set('drawFrequency', 'at_conclusion')
+                  }
+                }} options={MECHANIC_OPTIONS} />
+              </div>
 
-              {/* ── Regions ── */}
+              {/* Only show Draw Frequency for Sweepstakes */}
+              {showDrawFrequency && (
+                <div>
+                  <Label>Draw Frequency</Label>
+                  <Select value={form.drawFrequency} onChange={v => set('drawFrequency', v)} options={FREQUENCY_OPTIONS} />
+                </div>
+              )}
+
+              <div>
+                <Label>Entry Method</Label>
+                <Select value={form.entryMechanic} onChange={v => set('entryMechanic', v)} options={[
+                  { value: 'Account Based Purchases', label: 'Account Based Purchases' },
+                  { value: 'Purchase & Show Loyalty Card', label: 'Purchase & Show Loyalty Card' },
+                  { value: 'Online - Purchase Required', label: 'Online - Purchase Required' },
+                  { value: 'Online - No Purchase', label: 'Online - No Purchase' },
+                  { value: 'Other', label: 'Other' },
+                ]} />
+              </div>
+
+              {/* Regions */}
               <div>
                 <Label>Region *</Label>
                 <div className="space-y-2">
-
-                  {/* Row 1: main options + future markets right-aligned */}
                   <div className="flex items-center gap-2">
                     <RegionBtn active={hasNational} onClick={toggleNational}>Australia</RegionBtn>
                     <RegionBtn active={hasStates} onClick={toggleAustStates}>Aust States</RegionBtn>
@@ -397,8 +624,6 @@ export default function BuildFormPage() {
                       <RegionBtn future active={form.regions.includes('EU')} onClick={() => toggleRegion('EU')}>EU</RegionBtn>
                     </div>
                   </div>
-
-                  {/* State checkboxes — only when Aust States active */}
                   {hasStates && (
                     <div className="flex flex-wrap gap-1.5 pt-1 pl-1">
                       {AU_STATES.map(state => (
@@ -415,82 +640,135 @@ export default function BuildFormPage() {
                 </div>
                 {form.regions.length === 0 && <p className="text-white/30 text-xs mt-2">Select at least one region</p>}
               </div>
-
             </div>
           </div>
         )}
 
-        {/* ── Step 4: Prizes ── */}
-        {step === 4 && (
+        {/* ── Step 3: Prizes (draw only) / Step 4: Prizes (standard) ── */}
+        {((isDrawOnly && step === 3) || (!isDrawOnly && step === 4)) && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Prize structure</h2>
               <p className="text-white/40 text-sm">Add all prize tiers. Values drive permit fee calculations.</p>
             </div>
             <div className="space-y-3">
-              {form.prizes.map((prize, i) => (
+              {(isDrawOnly ? drawOnly.prizes : form.prizes).map((prize, i) => (
                 <div key={i} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-white font-bold text-sm">Prize {i + 1}</span>
-                    {form.prizes.length > 1 && (
-                      <button type="button" onClick={() => removePrize(i)} className="text-white/20 hover:text-red-400 transition-colors text-xs font-semibold">Remove</button>
+                    {(isDrawOnly ? drawOnly.prizes : form.prizes).length > 1 && (
+                      <button type="button" onClick={() => isDrawOnly ? removeDOPrize(i) : removePrize(i)} className="text-white/20 hover:text-red-400 transition-colors text-xs font-semibold">Remove</button>
                     )}
                   </div>
                   <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-3">
-                      <div><Label>Tier</Label><Input value={prize.tier} onChange={v => updatePrize(i, 'tier', v)} placeholder="1st" /></div>
-                      <div><Label>Qty</Label><Input value={String(prize.qty)} onChange={v => updatePrize(i, 'qty', parseInt(v) || 1)} type="number" placeholder="1" /></div>
-                      <div><Label>Unit Value ($)</Label><Input value={String(prize.unitValue || '')} onChange={v => updatePrize(i, 'unitValue', parseFloat(v) || 0)} type="number" placeholder="0" /></div>
+                      <div><Label>Tier</Label><Input value={prize.tier} onChange={v => isDrawOnly ? updateDOPrize(i, 'tier', v) : updatePrize(i, 'tier', v)} placeholder="1st" /></div>
+                      <div><Label>Qty</Label><Input value={String(prize.qty)} onChange={v => isDrawOnly ? updateDOPrize(i, 'qty', parseInt(v) || 1) : updatePrize(i, 'qty', parseInt(v) || 1)} type="number" placeholder="1" /></div>
+                      <div><Label>Unit Value ($)</Label><Input value={String(prize.unitValue || '')} onChange={v => isDrawOnly ? updateDOPrize(i, 'unitValue', parseFloat(v) || 0) : updatePrize(i, 'unitValue', parseFloat(v) || 0)} type="number" placeholder="0" /></div>
                     </div>
-                    <div><Label>Description</Label><Input value={prize.description} onChange={v => updatePrize(i, 'description', v)} placeholder="e.g. $5,000 cash prize" /></div>
+                    <div><Label>Description</Label><Input value={prize.description} onChange={v => isDrawOnly ? updateDOPrize(i, 'description', v) : updatePrize(i, 'description', v)} placeholder="e.g. $5,000 cash prize" /></div>
                     {prize.qty > 0 && prize.unitValue > 0 && (
                       <p className="text-white/30 text-xs">Subtotal: {formatMoney(prize.qty * prize.unitValue)}</p>
                     )}
                   </div>
                 </div>
               ))}
-              <button type="button" onClick={addPrize}
+              <button type="button" onClick={() => isDrawOnly ? addDOPrize() : addPrize()}
                 className="w-full bg-white/[0.03] border border-dashed border-white/[0.10] rounded-2xl py-4 text-white/30 hover:text-white/60 hover:border-white/20 transition-all text-sm font-semibold">
                 + Add prize tier
               </button>
             </div>
-            {prizePoolTotal > 0 && (
+            {(isDrawOnly ? doPrizePoolTotal : prizePoolTotal) > 0 && (
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl px-5 py-4 flex justify-between items-center">
                 <span className="text-white/40 text-sm">Total Prize Pool</span>
-                <span className="text-white font-black text-lg">{formatMoney(prizePoolTotal)}</span>
+                <span className="text-white font-black text-lg">{formatMoney(isDrawOnly ? doPrizePoolTotal : prizePoolTotal)}</span>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Step 5: Review ── */}
-        {step === 5 && (
+        {/* ── Step 4: Review (draw only) / Step 5: Review (standard) ── */}
+        {((isDrawOnly && step === 4) || (!isDrawOnly && step === 5)) && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Review & confirm</h2>
               <p className="text-white/40 text-sm">Check everything looks right before saving.</p>
             </div>
+
+            {/* Summary */}
             <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-3">
-              {[
-                { label: 'Promoter',  value: form.promoterName },
-                { label: 'Contact',   value: `${form.contactName} · ${form.contactEmail}` },
-                { label: 'Campaign',  value: form.campaignName },
-                { label: 'Code',      value: form.tsCode },
-                { label: 'Dates',     value: `${form.promoStart} → ${form.promoEnd}` },
-                { label: 'Mechanic',  value: form.drawMechanic },
-                { label: 'Frequency', value: form.drawFrequency },
-                { label: 'Regions',   value: formatRegionsSummary() },
-                { label: 'Prize Pool',value: formatMoney(prizePoolTotal) },
-                { label: 'Prizes',    value: `${form.prizes.length} tier(s)` },
-              ].map(row => (
-                <div key={row.label} className="flex gap-4">
-                  <span className="text-white/30 text-sm w-28 shrink-0">{row.label}</span>
-                  <span className="text-white/80 text-sm">{row.value || '—'}</span>
-                </div>
-              ))}
+              {isDrawOnly ? (
+                <>
+                  {[
+                    { label: 'Promoter',    value: form.promoterName },
+                    { label: 'Contact',     value: `${form.contactName} · ${form.contactEmail}` },
+                    { label: 'Campaign',    value: form.campaignName },
+                    { label: 'Type',        value: '⚡ Draw Only · Sweepstakes' },
+                    { label: 'Draw Date',   value: drawOnly.drawDate },
+                    { label: 'Draw Time',   value: drawOnly.drawTime },
+                    { label: 'Prize Pool',  value: formatMoney(doPrizePoolTotal) },
+                    { label: 'Prizes',      value: `${drawOnly.prizes.length} tier(s)` },
+                  ].map(row => (
+                    <div key={row.label} className="flex gap-4">
+                      <span className="text-white/30 text-sm w-28 shrink-0">{row.label}</span>
+                      <span className="text-white/80 text-sm">{row.value || '—'}</span>
+                    </div>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {[
+                    { label: 'Promoter',   value: form.promoterName },
+                    { label: 'Contact',    value: `${form.contactName} · ${form.contactEmail}` },
+                    { label: 'Campaign',   value: form.campaignName },
+                    { label: 'Code',       value: form.tsCode },
+                    { label: 'Dates',      value: `${form.promoStart} → ${form.promoEnd}` },
+                    { label: 'Mechanic',   value: form.drawMechanic },
+                    { label: 'Frequency',  value: showDrawFrequency ? form.drawFrequency : 'N/A' },
+                    { label: 'Regions',    value: formatRegionsSummary() },
+                    { label: 'Prize Pool', value: formatMoney(prizePoolTotal) },
+                    { label: 'Prizes',     value: `${form.prizes.length} tier(s)` },
+                  ].map(row => (
+                    <div key={row.label} className="flex gap-4">
+                      <span className="text-white/30 text-sm w-28 shrink-0">{row.label}</span>
+                      <span className="text-white/80 text-sm">{row.value || '—'}</span>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
-            {quote && (
+            {/* Quote */}
+            {isDrawOnly ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
+                <h3 className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-4">Quote — Draw Only</h3>
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between">
+                    <span className="text-white/60 text-sm">Campaign Management (Draw Only)</span>
+                    <span className="text-white/80 text-sm font-semibold">{formatMoney(doCampaignMgmtFee)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/60 text-sm">Draw Administration (1 draw)</span>
+                    <span className="text-white/80 text-sm font-semibold">{formatMoney(doDrawFee)}</span>
+                  </div>
+                </div>
+                <div className="border-t border-white/[0.06] pt-3 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-white font-bold">Total (excl GST)</span>
+                    <span className="text-white font-black text-lg">{formatMoney(doTotalExGst)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40 text-sm">GST</span>
+                    <span className="text-white/60 text-sm">{formatMoney(doGst)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-white/40 text-sm">Total (incl GST)</span>
+                    <span className="text-white/60 text-sm">{formatMoney(doTotalIncGst)}</span>
+                  </div>
+                </div>
+                <p className="text-white/20 text-xs mt-4">No terms fee · No permit fee · Proceeds directly to Scheduled on approval.</p>
+              </div>
+            ) : quote ? (
               <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6">
                 <h3 className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-4">Estimated Quote</h3>
                 <div className="space-y-2 mb-4">
@@ -506,7 +784,7 @@ export default function BuildFormPage() {
                   <span className="text-white font-black text-lg">{formatMoney(quote.totalExGst)}</span>
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
@@ -516,8 +794,8 @@ export default function BuildFormPage() {
             className={`text-white/40 hover:text-white text-sm font-semibold transition-all ${step === 1 ? 'invisible' : ''}`}>
             ← Back
           </button>
-          {step < 5 ? (
-            <button type="button" onClick={() => setStep(s => s + 1)} disabled={!canProceed()}
+          {step < maxStep ? (
+            <button type="button" onClick={handleNext} disabled={!canProceed()}
               className="bg-white text-[#0a0a0f] font-black text-sm px-8 py-3 rounded-xl hover:bg-white/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed">
               Continue →
             </button>
