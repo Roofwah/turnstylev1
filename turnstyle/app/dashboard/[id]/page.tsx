@@ -197,7 +197,7 @@ function CommandCentrePageInner() {
 
   const [loading, setLoading]         = useState(true)
   const [notFound, setNotFound]       = useState(false)
-  type TabId = 'overview' | 'quote' | 'terms' | 'abbr-terms' | 'qr-code' | 'loa' | 'draw' | 'winners' | 'history' | 'support'
+  type TabId = 'overview' | 'quote' | 'prizes' | 'terms' | 'abbr-terms' | 'qr-code' | 'loa' | 'draw' | 'winners' | 'history' | 'support'
   const [activeTab, setActiveTab] = useState<TabId>('overview')
   const searchParams = useSearchParams()
   const router = useRouter()
