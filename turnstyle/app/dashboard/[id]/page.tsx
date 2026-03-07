@@ -50,6 +50,12 @@ interface Campaign {
   permitNSW: string | null
   permitSA: string | null
   permitACT: string | null
+  mechanicType: string
+  prizesConfirmed: boolean
+  drawConfirmed: boolean
+  confirmedPrizes: any[]
+  prizePoolTotal: number
+
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
