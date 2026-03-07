@@ -153,15 +153,14 @@ function normaliseCampaign(raw: any): Campaign {
     permitNSW:     raw.permitNSW ?? null,
     permitSA:      raw.permitSA ?? null,
     permitACT:     raw.permitACT ?? null,
-    permitACT:     raw.permitACT ?? null,
     prizesConfirmed: raw.prizesConfirmed ?? false,
     drawConfirmed:   raw.drawConfirmed ?? false,
     confirmedPrizes: Array.isArray(raw.confirmedPrizes) ? raw.confirmedPrizes : [],
     prizePoolTotal:  raw.prizePoolTotal ? Number(raw.prizePoolTotal) : 0,
   }
 }
-  }
-}
+  
+
 
 // ─── Edit field components ────────────────────────────────────────────────────
 
