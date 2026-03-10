@@ -137,65 +137,70 @@ export default function PrizeWizardModal({
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 min-h-0">
 
-          <div className="flex gap-3 px-1 items-end">
-            <div className="w-8 text-white/30 text-xs uppercase tracking-widest shrink-0">#</div>
-            <div className="flex-1 text-white/30 text-xs uppercase tracking-widest">Description</div>
-            <div className="w-28 text-white/30 text-xs uppercase tracking-widest shrink-0">Type</div>
-            <div className="w-12 text-white/30 text-xs uppercase tracking-widest shrink-0 text-center">Qty</div>
-            <div className="w-28 text-white/30 text-xs uppercase tracking-widest shrink-0">Value</div>
-            <div className="w-5 shrink-0" />
+          <div className="flex flex-col gap-1 px-1 mb-1">
+            <div className="text-white/30 text-xs uppercase tracking-widest">Description</div>
+            <div className="hidden md:grid md:grid-cols-3 md:gap-3 text-white/30 text-[10px] uppercase tracking-widest">
+              <div>Type</div>
+              <div className="text-center">Qty</div>
+              <div className="text-right">Value</div>
+            </div>
           </div>
 
           {prizes.map((prize, i) => (
-            <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-2">
-              <div className="flex gap-3 items-start">
-                <div className="w-8 h-9 flex items-center justify-center text-white/40 text-sm font-black shrink-0">
-                  {i + 1}
-                </div>
-                <div className="flex-1">
-                  <textarea
-                    value={prize.description}
-                    onChange={e => updatePrize(i, 'description', e.target.value)}
-                    placeholder="e.g. 2025 Ford Mustang GT Fastback, valued at $65,000 drive away"
-                    rows={1}
-                    style={{ resize: 'none', overflow: 'hidden' }}
-                    onInput={e => {
-                      const el = e.target as HTMLTextAreaElement
-                      el.style.height = 'auto'
-                      el.style.height = el.scrollHeight + 'px'
-                    }}
-                    className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30 placeholder-white/20 leading-snug"
-                  />
-                </div>
-                <div className="w-28 shrink-0">
-                  <select value={prize.type} onChange={e => updatePrize(i, 'type', e.target.value)}
-                    className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-2 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer h-9">
-                    <option value="" className="bg-[#0f0f17]">Type…</option>
-                    {PRIZE_TYPES.map(t => <option key={t} value={t} className="bg-[#0f0f17]">{t}</option>)}
-                  </select>
-                </div>
-                <div className="w-12 shrink-0">
-                  <input type="number" min="1" value={prize.qty}
-                    onChange={e => updatePrize(i, 'qty', parseInt(e.target.value) || 1)}
-                    className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-white/30 text-center h-9" />
-                </div>
-                <div className="w-28 shrink-0">
-                  <div className="relative">
-                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm">$</span>
-                    <input type="number" min="0" value={prize.unitValue || ''}
-                      onChange={e => updatePrize(i, 'unitValue', parseFloat(e.target.value) || 0)}
-                      placeholder="0"
-                      className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg pl-6 pr-2 py-2 text-white text-sm focus:outline-none focus:border-white/30 placeholder-white/20 h-9" />
+            <div key={i} className="bg-white/[0.02] border border-white/[0.06] rounded-xl p-3 space-y-3">
+              <div>
+                <textarea
+                  value={prize.description}
+                  onChange={e => updatePrize(i, 'description', e.target.value)}
+                  placeholder="e.g. 2025 Ford Mustang GT Fastback, valued at $65,000 drive away"
+                  rows={3}
+                  style={{ resize: 'none', minHeight: '4.5rem' }}
+                  onInput={e => {
+                    const el = e.target as HTMLTextAreaElement
+                    el.style.height = 'auto'
+                    el.style.height = el.scrollHeight + 'px'
+                  }}
+                  className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-white/30 placeholder-white/20 leading-snug"
+                />
+              </div>
+
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 flex-1">
+                  <div>
+                    <select value={prize.type} onChange={e => updatePrize(i, 'type', e.target.value)}
+                      className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-2 py-2 text-white text-xs focus:outline-none appearance-none cursor-pointer h-9">
+                      <option value="" className="bg-[#0f0f17]">Type…</option>
+                      {PRIZE_TYPES.map(t => <option key={t} value={t} className="bg-[#0f0f17]">{t}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <input type="number" min="1" value={prize.qty}
+                      onChange={e => updatePrize(i, 'qty', parseInt(e.target.value) || 1)}
+                      className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg px-2 py-2 text-white text-sm focus:outline-none focus:border-white/30 text-left h-9"
+                      placeholder="Quantity" />
+                  </div>
+                  <div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/30 text-sm">$</span>
+                      <input type="number" min="0" value={prize.unitValue || ''}
+                        onChange={e => updatePrize(i, 'unitValue', parseFloat(e.target.value) || 0)}
+                        placeholder="Unit value"
+                        className="w-full bg-white/[0.06] border border-white/[0.10] rounded-lg pl-6 pr-2 py-2 text-white text-sm focus:outline-none focus:border-white/30 placeholder-white/20 h-9" />
+                    </div>
                   </div>
                 </div>
-                <div className="w-5 shrink-0 flex items-center justify-center h-9">
-                  {prizes.length > 1 && (
-                    <button onClick={() => removePrize(i)} className="text-white/20 hover:text-red-400 transition-colors text-xl leading-none">×</button>
-                  )}
-                </div>
+                {prizes.length > 1 && (
+                  <button
+                    onClick={() => removePrize(i)}
+                    className="self-start md:self-auto text-white/20 hover:text-red-400 transition-colors text-xl leading-none"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
+
               {prize.qty > 0 && prize.unitValue > 0 && (
-                <div className="text-white/30 text-xs pl-11">
+                <div className="text-white/30 text-xs">
                   Subtotal: {formatMoney(prize.qty * prize.unitValue)}
                 </div>
               )}

@@ -627,10 +627,6 @@ export default function BuildFormPage() {
                 <Label>Entry Method</Label>
                 <Select value={form.entryMechanic} onChange={v => {
                   set('entryMechanic', v)
-                  if (v && v !== 'Other') {
-                    setMechanicDetails(null)
-                    setShowMechanicWizard(true)
-                  }
                 }} options={[
                   { value: 'Account Based Purchases', label: 'Account Based Purchases' },
                   { value: 'Purchase & Show Loyalty Card', label: 'Purchase & Show Loyalty Card' },
@@ -728,12 +724,33 @@ export default function BuildFormPage() {
                   <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Draws confirmed</span>
                   <button type="button" onClick={() => setShowDrawWizard(true)} className="text-white/30 hover:text-white text-xs font-semibold">Edit</button>
                 </div>
-                {confirmedDrawSchedule.map((d: any, i: number) => (
-                  <div key={i} className="flex justify-between text-sm">
-                    <span className="text-white/60">{d.name}</span>
-                    <span className="text-white/50">{d.date}</span>
-                  </div>
-                ))}
+                {confirmedDrawSchedule.map((d: any, i: number) => {
+                  const dateStr = d.drawDate || d.date || ''
+                  let prettyDate = '—'
+                  if (dateStr) {
+                    const [y, m, day] = dateStr.split('-').map((n: string) => parseInt(n, 10))
+                    const dt = new Date(y, m - 1, day)
+                    const weekday = dt.toLocaleDateString('en-AU', { weekday: 'long' })
+                    const month = dt.toLocaleDateString('en-AU', { month: 'short' })
+                    const dnum = dt.getDate()
+                    const suffix =
+                      dnum % 10 === 1 && dnum !== 11 ? 'st' :
+                      dnum % 10 === 2 && dnum !== 12 ? 'nd' :
+                      dnum % 10 === 3 && dnum !== 13 ? 'rd' :
+                      'th'
+                    prettyDate = `${weekday} ${dnum}${suffix} ${month}`
+                  }
+                  const timeStr = d.drawTime || d.time || ''
+                  return (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-white/60">{d.name}</span>
+                      <span className="text-white/50">
+                        {prettyDate}
+                        {timeStr ? ` · ${timeStr}` : ''}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <div className="bg-white/[0.03] border border-dashed border-white/[0.10] rounded-2xl p-8 flex flex-col items-center gap-4">

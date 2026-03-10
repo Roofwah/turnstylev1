@@ -60,6 +60,21 @@ function formatDisplayDate(dateStr: string): string {
   return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function formatFullDayDate(dateStr: string): string {
+  if (!dateStr) return ''
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const weekday = date.toLocaleDateString('en-AU', { weekday: 'long' })
+  const month = date.toLocaleDateString('en-AU', { month: 'long' })
+  const dayNum = date.getDate()
+  const suffix =
+    dayNum % 10 === 1 && dayNum !== 11 ? 'st' :
+    dayNum % 10 === 2 && dayNum !== 12 ? 'nd' :
+    dayNum % 10 === 3 && dayNum !== 13 ? 'rd' :
+    'th'
+  return `${weekday} ${dayNum}${suffix} ${month}`
+}
+
 function daysBetween(startStr: string, endStr: string): number {
   const [sy, sm, sd] = startStr.split('T')[0].split('-').map(Number)
   const [ey, em, ed] = endStr.split('T')[0].split('-').map(Number)
@@ -333,7 +348,7 @@ export default function DrawWizardModal({
           <div className="flex items-center gap-3 px-1 mb-1">
             <div className="w-5 shrink-0" />
             <div className="flex-1 text-white/30 text-xs uppercase tracking-widest">Draw Name</div>
-            <div className="w-36 text-white/30 text-xs uppercase tracking-widest shrink-0">Date</div>
+            <div className="w-48 text-white/30 text-xs uppercase tracking-widest shrink-0">Date</div>
             <div className="w-20 text-white/30 text-xs uppercase tracking-widest shrink-0">Time</div>
           </div>
 
@@ -366,14 +381,16 @@ export default function DrawWizardModal({
                     />
 
                     {/* Date */}
-                    <div className="w-36 shrink-0">
-                      {isThisFinalDate && isFinal(draw) ? (
-                        <span className="text-white/40 text-xs">{formatDisplayDate(date)} (locked)</span>
-                      ) : (
-                        <input type="date" value={draw.drawDate}
-                          onChange={e => updateDraw(draw.id, 'drawDate', e.target.value)}
-                          className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-white/30" />
-                      )}
+                    <div className="w-48 shrink-0">
+                      <div className="text-white/60 text-xs mb-0.5">
+                        {draw.drawDate ? formatFullDayDate(draw.drawDate) : '—'}
+                      </div>
+                      <input
+                        type="date"
+                        value={draw.drawDate}
+                        onChange={e => updateDraw(draw.id, 'drawDate', e.target.value)}
+                        className="w-full bg-white/[0.06] border border-white/[0.08] rounded-lg px-2 py-1 text-white text-xs focus:outline-none focus:border-white/30"
+                      />
                     </div>
 
                     {/* Time */}

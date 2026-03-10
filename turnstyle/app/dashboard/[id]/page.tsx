@@ -814,8 +814,8 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
               </div>
             </div>
 
-            {/* Prizes */}
-            <div className={`border rounded-2xl p-6 md:col-span-2 transition-all ${editing ? 'bg-white/[0.04] border-white/[0.12]' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+            {/* Prize Structure (left) */}
+            <div className={`border rounded-2xl p-6 transition-all ${editing ? 'bg-white/[0.04] border-white/[0.12]' : 'bg-white/[0.03] border-white/[0.06]'}`}>
               <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4 opacity-60">Prize Structure</h2>
               {editing ? (
                 <div className="space-y-3">
@@ -866,6 +866,40 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                     <span className="text-white/40 text-sm font-semibold">Total Prize Pool</span>
                     <span className="text-white font-black">{formatMoney(prizePoolTotal)}</span>
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Draw Structure (right) — scheduled prize draws */}
+            <div className={`border rounded-2xl p-6 transition-all bg-white/[0.03] border-white/[0.06]`}>
+              <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4 opacity-60">Draw Structure</h2>
+              {(campaign.drawSchedule ?? []).length === 0 ? (
+                <p className="text-white/30 text-sm">No draws scheduled yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {(campaign.drawSchedule ?? []).map((draw: any, i: number) => {
+                    const dateStr = draw.drawDate || ''
+                    let prettyDate = '—'
+                    if (dateStr) {
+                      const [y, m, d] = dateStr.split('-').map((n: string) => parseInt(n, 10))
+                      const dt = new Date(y, m - 1, d)
+                      const weekday = dt.toLocaleDateString('en-AU', { weekday: 'long' })
+                      const month = dt.toLocaleDateString('en-AU', { month: 'short' })
+                      const dnum = dt.getDate()
+                      const suffix = dnum % 10 === 1 && dnum !== 11 ? 'st' : dnum % 10 === 2 && dnum !== 12 ? 'nd' : dnum % 10 === 3 && dnum !== 13 ? 'rd' : 'th'
+                      prettyDate = `${weekday} ${dnum}${suffix} ${month}`
+                    }
+                    const timeStr = draw.drawTime || ''
+                    return (
+                      <div key={draw.id ?? i} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
+                        <span className="text-white/80 text-sm">{draw.name || `Draw ${i + 1}`}</span>
+                        <span className="text-white/50 text-xs">
+                          {prettyDate}
+                          {timeStr ? ` · ${timeStr}` : ''}
+                        </span>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -928,7 +962,10 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                       await confirmQuote(campaign.id)
                       const now = new Date()
                       setConfirmedAt(now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) + ' ' + now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }))
-                      router.refresh()
+                      // Optimistically update local campaign status and move user to Terms tab
+                      setCampaign(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
+                      setDraft(prev => prev ? { ...prev, status: 'CONFIRMED' } : prev)
+                      setActiveTab('terms')
                     } finally {
                       setConfirming(false)
                     }
