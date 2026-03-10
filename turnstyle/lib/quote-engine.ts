@@ -40,6 +40,7 @@ export interface QuoteInput {
   promoEnd: string         // ISO date string "YYYY-MM-DD"
   drawMechanic: string     // raw string from form e.g. "Sweepstakes - Random Draw"
   drawFrequency: string    // raw string from form e.g. "Weekly"
+  overrideDrawCount?: number
   prizes: PrizeTier[]
   // Computed from prizes:
   prizePoolTotal?: number  // if not provided, computed from prizes array
@@ -92,7 +93,7 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
   const start = parseDate(input.promoStart)
   const end   = parseDate(input.promoEnd)
 
-  const drawCount    = calculateDrawCount(input.drawFrequency, start, end)
+  const drawCount    = input.overrideDrawCount ?? calculateDrawCount(input.drawFrequency, start, end)
   const isConclusion = isAtConclusionFrequency(input.drawFrequency)
 
   const termsFee  = calcTermsFee(promoType, prizePoolTotal)

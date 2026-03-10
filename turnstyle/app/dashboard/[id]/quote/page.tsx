@@ -49,6 +49,7 @@ function normaliseCampaign(raw: any) {
     regions:       raw.regions ?? [],
     prizes:        Array.isArray(raw.prizes) ? raw.prizes : [],
     notes:         raw.notes ?? '',
+    drawSchedule:  Array.isArray(raw.drawSchedule) ? raw.drawSchedule : [],
   }
 }
 
@@ -76,14 +77,15 @@ export default function QuotePrintPage() {
   const prizePoolTotal = campaign.prizes.reduce((s: number, p: any) => s + p.qty * p.unitValue, 0)
 
   const quote = calculateQuote({
-    campaignId:    campaign.id,
-    tsCode:        campaign.tsCode,
-    campaignName:  campaign.name,
-    promoStart:    campaign.promoStart,
-    promoEnd:      campaign.promoEnd,
-    drawMechanic:  campaign.drawMechanic,
-    drawFrequency: campaign.drawFrequency,
-    prizes:        campaign.prizes,
+    campaignId:        campaign.id,
+    tsCode:            campaign.tsCode,
+    campaignName:      campaign.name,
+    promoStart:        campaign.promoStart,
+    promoEnd:          campaign.promoEnd,
+    drawMechanic:      campaign.drawMechanic,
+    drawFrequency:     campaign.drawFrequency,
+    prizes:            campaign.prizes,
+    overrideDrawCount: campaign.drawSchedule?.length > 0 ? campaign.drawSchedule.length : undefined,
   })
 
   const now        = new Date()

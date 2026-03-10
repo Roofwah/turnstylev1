@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { generateQuote } from '@/app/actions/generateQuote'
 
 export async function GET(
   req: NextRequest,
@@ -49,16 +50,39 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await req.json()
+
+    // Determine if this change should trigger a quote regeneration
+    const quoteAffectingFields = ['prizes', 'confirmedPrizes', 'prizePoolTotal', 'drawSchedule']
+    const shouldRegenerateQuote = quoteAffectingFields.some(f => body[f] !== undefined)
+
     const campaign = await prisma.campaign.update({
       where: { id },
       data: {
-        ...(body.drawSchedule !== undefined && { drawSchedule: body.drawSchedule }),
+        // Draw schedule & permits
+        ...(body.drawSchedule   !== undefined && { drawSchedule:   body.drawSchedule }),
+        ...(body.drawConfirmed  !== undefined && { drawConfirmed:  body.drawConfirmed }),
         ...(body.permitLOASigned !== undefined && { permitLOASigned: body.permitLOASigned }),
-        ...(body.permitNSW !== undefined && { permitNSW: body.permitNSW }),
-        ...(body.permitSA !== undefined && { permitSA: body.permitSA }),
-        ...(body.permitACT !== undefined && { permitACT: body.permitACT }),
+        ...(body.permitNSW      !== undefined && { permitNSW:      body.permitNSW }),
+        ...(body.permitSA       !== undefined && { permitSA:       body.permitSA }),
+        ...(body.permitACT      !== undefined && { permitACT:      body.permitACT }),       // Prizes
+        ...(body.prizes         !== undefined && { prizes:         body.prizes }),
+        ...(body.confirmedPrizes !== undefined && { confirmedPrizes: body.confirmedPrizes }),
+        ...(body.prizesConfirmed !== undefined && { prizesConfirmed: body.prizesConfirmed }),
+        ...(body.prizePoolTotal !== undefined && { prizePoolTotal: body.prizePoolTotal }),
+        ...(body.maxStatePool   !== undefined && { maxStatePool:   body.maxStatePool }),
+        ...(body.requiredPermits !== undefined && { requiredPermits: body.requiredPermits }),
+      
+      
+     
+      
       },
     })
+
+    // Regenerate quote if prize pool or draw schedule changed
+    if (shouldRegenerateQuote) {
+      await generateQuote(id)
+    }
+
     return NextResponse.json(campaign)
   } catch (e: any) {
     console.error('PATCH /api/campaigns/[id] error:', e)

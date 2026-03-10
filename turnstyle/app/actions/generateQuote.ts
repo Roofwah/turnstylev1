@@ -13,7 +13,6 @@ export async function generateQuote(campaignId: string) {
   if (!raw) throw new Error('Campaign not found')
 
   const prizes = Array.isArray(raw.prizes) ? raw.prizes as any[] : []
-  const prizePoolTotal = prizes.reduce((s: number, p: any) => s + p.qty * p.unitValue, 0)
 
   const drawMechanic = raw.mechanicType === 'SWEEPSTAKES'   ? 'Sweepstakes - Random Draw'
                      : raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer'
@@ -21,15 +20,21 @@ export async function generateQuote(campaignId: string) {
 
   const drawFrequency = (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('at_conclusion', 'at_conclusion')
 
+  // If a confirmed draw schedule exists, use its actual length as the draw count
+  // rather than calculating it from drawFrequency + promo period length
+  const drawSchedule = Array.isArray(raw.drawSchedule) ? raw.drawSchedule as any[] : []
+  const overrideDrawCount = drawSchedule.length > 0 ? drawSchedule.length : undefined
+
   const quote = calculateQuote({
-    campaignId:    raw.id,
-    tsCode:        raw.tsCode,
-    campaignName:  raw.name,
-    promoStart:    raw.promoStart?.toISOString().split('T')[0] ?? '',
-    promoEnd:      raw.promoEnd?.toISOString().split('T')[0] ?? '',
+    campaignId:        raw.id,
+    tsCode:            raw.tsCode,
+    campaignName:      raw.name,
+    promoStart:        raw.promoStart?.toISOString().split('T')[0] ?? '',
+    promoEnd:          raw.promoEnd?.toISOString().split('T')[0] ?? '',
     drawMechanic,
     drawFrequency,
     prizes,
+    overrideDrawCount,
   })
 
   // Supersede any existing draft quotes
@@ -38,17 +43,17 @@ export async function generateQuote(campaignId: string) {
     data:  { status: QuoteStatus.SUPERSEDED },
   })
 
-  // Save new quote
+  // Save new quote — use direct fields from quote result, not lines.find()
   await prisma.quote.create({
     data: {
       campaignId,
       quoteNumber:   quote.quoteNumber,
       quoteHash:     quote.quoteHash,
       status:        QuoteStatus.DRAFT,
-      termsFee:      quote.lines.find((l: any) => l.key === 'terms')?.amount ?? 0,
-      mgmtFee:       quote.lines.find((l: any) => l.key === 'mgmt')?.amount ?? 0,
-      permitFee:     quote.lines.find((l: any) => l.key === 'permit')?.amount ?? 0,
-      drawFee:       quote.lines.find((l: any) => l.key === 'draw')?.amount ?? 0,
+      termsFee:      quote.termsFee,
+      mgmtFee:       quote.mgmtFee,
+      permitFee:     quote.permitFee,
+      drawFee:       quote.drawFee,
       totalExGst:    quote.totalExGst,
       gstAmount:     quote.gstAmount,
       totalIncGst:   quote.totalIncGst,

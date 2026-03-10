@@ -26,6 +26,11 @@ export async function deleteCampaign(id: string) {
   await prisma.termsDraft.deleteMany({ where: { campaignId: id } })
 
   // Delete quotes
+  // Delete approval records (linked to quotes)
+  const quotes = await prisma.quote.findMany({ where: { campaignId: id }, select: { id: true } })
+  const quoteIds = quotes.map(q => q.id)
+  await prisma.approvalRecord.deleteMany({ where: { quoteId: { in: quoteIds } } })
+  // Delete quotes
   await prisma.quote.deleteMany({ where: { campaignId: id } })
   // Delete other related records
   await prisma.generatedDocument.deleteMany({ where: { campaignId: id } })

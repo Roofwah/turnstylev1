@@ -79,7 +79,7 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">A</span>
+            <span className="text-white text-xs font-bold">CS</span>
           </div>
         </div>
         </div>
@@ -93,6 +93,12 @@ export default async function DashboardPage() {
             <p className="text-white/40 text-sm">{campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}</p>
           </div>
           <Link
+  href="/dashboard/express"
+  className="bg-[#c8f135] text-black font-black text-sm px-5 py-2.5 rounded-xl hover:bg-[#d4ff3d] transition-all flex items-center gap-2"
+>
+  ⚡ Express
+</Link>
+<Link
             href="/dashboard/new"
             className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all flex items-center gap-2"
           >

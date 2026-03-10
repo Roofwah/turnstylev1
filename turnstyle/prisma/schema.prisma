@@ -87,6 +87,8 @@ model Campaign {
   prizesConfirmed    Boolean   @default(false) @map("prizes_confirmed")
   drawConfirmed      Boolean   @default(false) @map("draw_confirmed")
   confirmedPrizes    Json?     @map("confirmed_prizes")
+  maxStatePool    Float?   @default(0) @map("max_state_pool")
+requiredPermits String[] @map("required_permits")
 
   promoter      Promoter?           @relation(fields: [promoterId], references: [id])
   createdBy     User                @relation(fields: [createdById], references: [id])

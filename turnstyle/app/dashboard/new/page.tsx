@@ -6,7 +6,9 @@ import Link from 'next/link'
 import { calculateQuote, calcDrawFee } from '@/lib/quote-engine'
 import { createCampaign, createDrawOnlyCampaign } from '@/app/actions/campaigns'
 import { searchPromoters, type PromoterRecord } from '@/lib/promoter-lookup'
-
+import MechanicWizardModal, { type MechanicDetails } from '@/components/MechanicWizardModal'
+import PrizeWizardModal from '@/components/PrizeWizardModal'
+import DrawWizardModal from '@/components/DrawWizardModal'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PrizeTier {
@@ -72,7 +74,8 @@ const STEPS = [
   { id: 2, label: 'Campaign' },
   { id: 3, label: 'Mechanic' },
   { id: 4, label: 'Prizes' },
-  { id: 5, label: 'Review' },
+  { id: 5, label: 'Draws' },
+  { id: 6, label: 'Review' },
 ]
 
 const DRAW_ONLY_STEPS = [
@@ -212,6 +215,20 @@ export default function BuildFormPage() {
     prizes: [{ ...EMPTY_PRIZE, tier: '1st' }],
   })
 
+  const [showMechanicWizard, setShowMechanicWizard] = useState(false)
+  const [mechanicDetails, setMechanicDetails] = useState<MechanicDetails | null>(null)
+
+  const [showPrizeWizard, setShowPrizeWizard] = useState(false)
+  const [prizesConfirmed, setPrizesConfirmed] = useState(false)
+  const [confirmedPrizes, setConfirmedPrizes] = useState<any[]>([])
+  const [prizePoolTotal, setPrizePoolTotal] = useState(0)
+  const [maxStatePool, setMaxStatePool] = useState(0)
+  const [requiredPermits, setRequiredPermits] = useState<string[]>([])
+
+  const [showDrawWizard, setShowDrawWizard] = useState(false)
+  const [drawsConfirmed, setDrawsConfirmed] = useState(false)
+  const [confirmedDrawSchedule, setConfirmedDrawSchedule] = useState<any[]>([])
+
   const [drawOnly, setDrawOnly] = useState<DrawOnlyData>({
     promoterName: '', promoterAbn: '', contactName: '', contactEmail: '', promoterAddress: '',
     campaignName: '', drawDate: '', drawTime: '',
@@ -322,12 +339,11 @@ export default function BuildFormPage() {
   }
 
   // ── Live quote (standard) ──
-  const prizePoolTotal = form.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
   const hasQuoteInputs  = form.promoStart && form.promoEnd && form.drawMechanic
   const quote = hasQuoteInputs ? calculateQuote({
     campaignId: 'new', tsCode: form.tsCode || 'XXXXX', campaignName: form.campaignName,
     promoStart: form.promoStart, promoEnd: form.promoEnd,
-    drawMechanic: form.drawMechanic, drawFrequency: form.drawFrequency, prizes: form.prizes,
+    drawMechanic: form.drawMechanic, drawFrequency: form.drawFrequency, prizes: confirmedPrizes.length > 0 ? confirmedPrizes : form.prizes,
   }) : null
 
   // ── Draw Only quote ──
@@ -351,7 +367,8 @@ export default function BuildFormPage() {
     if (step === 1) return !!(form.promoterName && form.contactName && form.contactEmail)
     if (step === 2) return !!(form.campaignName && form.promoStart && form.promoEnd)
     if (step === 3) return !!(form.drawMechanic && form.regions.length > 0)
-    if (step === 4) return form.prizes.length > 0 && form.prizes.every(p => p.description && p.qty > 0 && p.unitValue > 0)
+    if (step === 4) return prizesConfirmed
+    if (step === 5) return drawsConfirmed
     return true
   }
 
@@ -368,7 +385,10 @@ export default function BuildFormPage() {
         campaignName: form.campaignName,
       })
     } else {
-      await createCampaign(form)
+      await createCampaign({
+        ...form,
+        prizes: confirmedPrizes.length > 0 ? confirmedPrizes : form.prizes,
+      })
     }
   }
 
@@ -391,7 +411,10 @@ export default function BuildFormPage() {
 
   // ── Handle step 2 Next in draw only mode ──
   function handleNext() {
-    setStep(s => s + 1)
+    const next = step + 1
+    setStep(next)
+    if (next === 4 && !prizesConfirmed) setShowPrizeWizard(true)
+    if (next === 5 && !drawsConfirmed) setShowDrawWizard(true)
   }
 
   return (
@@ -602,13 +625,25 @@ export default function BuildFormPage() {
 
               <div>
                 <Label>Entry Method</Label>
-                <Select value={form.entryMechanic} onChange={v => set('entryMechanic', v)} options={[
+                <Select value={form.entryMechanic} onChange={v => {
+                  set('entryMechanic', v)
+                  if (v && v !== 'Other') {
+                    setMechanicDetails(null)
+                    setShowMechanicWizard(true)
+                  }
+                }} options={[
                   { value: 'Account Based Purchases', label: 'Account Based Purchases' },
                   { value: 'Purchase & Show Loyalty Card', label: 'Purchase & Show Loyalty Card' },
                   { value: 'Online - Purchase Required', label: 'Online - Purchase Required' },
                   { value: 'Online - No Purchase', label: 'Online - No Purchase' },
                   { value: 'Other', label: 'Other' },
                 ]} />
+                {mechanicDetails && (
+                  <div className="mt-2 flex items-center justify-between bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2">
+                    <span className="text-white/50 text-xs">{mechanicDetails.purchaseValue ? ('Purchase $' + mechanicDetails.purchaseValue + ' (' + mechanicDetails.gstType + '. GST) of any ' + mechanicDetails.participatingBrand) : 'No purchase necessary'}</span>
+                    <button type="button" onClick={() => setShowMechanicWizard(true)} className="text-white/30 hover:text-white text-xs font-semibold ml-3 shrink-0">Edit</button>
+                  </div>
+                )}
               </div>
 
               {/* Regions */}
@@ -644,8 +679,76 @@ export default function BuildFormPage() {
           </div>
         )}
 
-        {/* ── Step 3: Prizes (draw only) / Step 4: Prizes (standard) ── */}
-        {((isDrawOnly && step === 3) || (!isDrawOnly && step === 4)) && (
+        {/* ── Step 4: Prizes (standard) — Prize Wizard ── */}
+        {!isDrawOnly && step === 4 && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-white font-black text-2xl mb-1">Prize structure</h2>
+              <p className="text-white/40 text-sm">Define your prize pool using the prize wizard.</p>
+            </div>
+            {prizesConfirmed ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Prizes confirmed</span>
+                  <button type="button" onClick={() => setShowPrizeWizard(true)} className="text-white/30 hover:text-white text-xs font-semibold">Edit</button>
+                </div>
+                {confirmedPrizes.map((p: any, i: number) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-white/60">Tier {p.tier} · {p.description}</span>
+                    <span className="text-white/80 font-semibold">{p.qty} x ${Number(p.unitValue).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="border-t border-white/[0.06] pt-3 flex justify-between">
+                  <span className="text-white/40 text-sm">Total Prize Pool</span>
+                  <span className="text-white font-black">${prizePoolTotal.toLocaleString()}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white/[0.03] border border-dashed border-white/[0.10] rounded-2xl p-8 flex flex-col items-center gap-4">
+                <p className="text-white/30 text-sm">No prizes configured yet</p>
+                <button type="button" onClick={() => setShowPrizeWizard(true)}
+                  className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-all">
+                  Open Prize Wizard
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 5: Draws (standard) — Draw Wizard ── */}
+        {!isDrawOnly && step === 5 && (
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-white font-black text-2xl mb-1">Draw schedule</h2>
+              <p className="text-white/40 text-sm">Configure your draw dates using the draw wizard.</p>
+            </div>
+            {drawsConfirmed ? (
+              <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-6 space-y-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-emerald-400 text-xs font-bold uppercase tracking-widest">Draws confirmed</span>
+                  <button type="button" onClick={() => setShowDrawWizard(true)} className="text-white/30 hover:text-white text-xs font-semibold">Edit</button>
+                </div>
+                {confirmedDrawSchedule.map((d: any, i: number) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-white/60">{d.name}</span>
+                    <span className="text-white/50">{d.date}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white/[0.03] border border-dashed border-white/[0.10] rounded-2xl p-8 flex flex-col items-center gap-4">
+                <p className="text-white/30 text-sm">No draws configured yet</p>
+                <button type="button" onClick={() => setShowDrawWizard(true)}
+                  className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-all">
+                  Open Draw Wizard
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Step 3: Prizes (draw only) ── */}
+        {isDrawOnly && step === 3 && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Prize structure</h2>
@@ -687,8 +790,8 @@ export default function BuildFormPage() {
           </div>
         )}
 
-        {/* ── Step 4: Review (draw only) / Step 5: Review (standard) ── */}
-        {((isDrawOnly && step === 4) || (!isDrawOnly && step === 5)) && (
+        {/* ── Step 4: Review (draw only) / Step 6: Review (standard) ── */}
+        {((isDrawOnly && step === 4) || (!isDrawOnly && step === 6)) && (
           <div className="space-y-5">
             <div>
               <h2 className="text-white font-black text-2xl mb-1">Review & confirm</h2>
@@ -808,6 +911,53 @@ export default function BuildFormPage() {
         </div>
 
       </main>
+
+      {showMechanicWizard && form.entryMechanic && form.entryMechanic !== 'Other' && (
+        <MechanicWizardModal
+          entryMechanic={form.entryMechanic}
+          initialDetails={mechanicDetails ?? undefined}
+          onConfirm={(details) => { setMechanicDetails(details); setShowMechanicWizard(false) }}
+          onClose={() => setShowMechanicWizard(false)}
+        />
+      )}
+
+      {showPrizeWizard && (
+        <PrizeWizardModal
+          campaignId="new"
+          existingPrizes={confirmedPrizes.length > 0 ? confirmedPrizes : []}
+          originalPrizePoolTotal={prizePoolTotal}
+          initialMaxStatePool={maxStatePool}
+          onConfirm={(prizes, msp, permits) => {
+            setConfirmedPrizes(prizes)
+            setPrizePoolTotal(prizes.reduce((s: number, p: any) => s + p.qty * p.unitValue, 0))
+            setMaxStatePool(msp)
+            setRequiredPermits(permits)
+            setPrizesConfirmed(true)
+            setShowPrizeWizard(false)
+          }}
+          onClose={() => setShowPrizeWizard(false)}
+        />
+      )}
+
+      {showDrawWizard && (
+        <DrawWizardModal
+          campaignId="new"
+          promoStart={form.promoStart}
+          promoEnd={form.promoEnd}
+          drawFrequency={form.drawFrequency}
+          totalPrizePool={prizePoolTotal}
+          maxStatePool={maxStatePool}
+          existingDrawSchedule={confirmedDrawSchedule}
+          originalDrawFee={0}
+          onConfirm={(schedule) => {
+            setConfirmedDrawSchedule(schedule)
+            setDrawsConfirmed(true)
+            setShowDrawWizard(false)
+          }}
+          onClose={() => setShowDrawWizard(false)}
+        />
+      )}
+
     </div>
   )
 }
