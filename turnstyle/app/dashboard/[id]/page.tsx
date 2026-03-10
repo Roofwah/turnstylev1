@@ -55,7 +55,7 @@ interface Campaign {
   drawConfirmed: boolean
   confirmedPrizes: any[]
   prizePoolTotal: number
-
+  maxStatePool: number
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -136,7 +136,8 @@ function normaliseCampaign(raw: any): Campaign {
                    raw.mechanicType === 'GAME_OF_SKILL' ? 'Game of Skill' :
                    raw.mechanicType === 'DRAW_ONLY' ? 'Draw Only' :
                    raw.mechanicType === 'OTHER' ? 'Other' : '',
-    drawFrequency: (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('_', '_'),
+    drawFrequency:   (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase(),
+    maxStatePool:    raw.maxStatePool ?? 0,
     entryMechanic: raw.entryMechanic ?? '',
     regions:       raw.regions ?? [],
     prizes:        Array.isArray(raw.prizes) ? raw.prizes : [],
@@ -209,6 +210,7 @@ function CommandCentrePageInner() {
   const [mobileTabOpen, setMobileTabOpen] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const [showPrizeWizard, setShowPrizeWizard] = useState(false)
 const [showDrawWizard, setShowDrawWizard] = useState(false)
 
@@ -299,7 +301,10 @@ const [showDrawWizard, setShowDrawWizard] = useState(false)
 
   // ── Live quote ──
   const source = editing ? draft : campaign
-  const prizePoolTotal = source.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
+  const activePrizes = (source.confirmedPrizes?.length > 0 ? source.confirmedPrizes : source.prizes) ?? source.prizes
+  const prizePoolTotal = source.prizePoolTotal > 0
+    ? source.prizePoolTotal
+    : activePrizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
 // ── Countdown ──
 const nowMs2 = Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
 const daysUntilFn = (d: string | null) => {
@@ -325,14 +330,15 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
 
 
   const quote = calculateQuote({
-    campaignId:    source.id,
-    tsCode:        source.tsCode,
-    campaignName:  source.name,
-    promoStart:    source.promoStart,
-    promoEnd:      source.promoEnd,
-    drawMechanic:  source.drawMechanic,
-    drawFrequency: source.drawFrequency,
-    prizes:        source.prizes,
+    campaignId:     source.id,
+    tsCode:         source.tsCode,
+    campaignName:   source.name,
+    promoStart:     source.promoStart,
+    promoEnd:       source.promoEnd,
+    drawMechanic:   source.drawMechanic,
+    drawFrequency:  source.drawFrequency,
+    prizes:         activePrizes,
+    prizePoolTotal: prizePoolTotal,
   })
 
   const status = statusConfig[campaign.status] ?? statusConfig.DRAFT
@@ -562,9 +568,11 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                   } else if (days < 5.5) {
                     icon = '❌'; msg = `Too late — starts in ${days} business day${days === 1 ? '' : 's'}`; color = 'text-red-400'
                   } else if (state === 'SA' && days < 10.5) {
-                    icon = '⚠️'; msg = 'Rush only* · est. issue ' + estStr; color = 'text-amber-400'
+                    const saRushFee = prize <= 10000 ? 270 : prize <= 50000 ? 955 : prize <= 100000 ? 1650 : 2800
+                    icon = '⚠️'; msg = 'Rush only* · est. issue ' + estStr + ' (+$' + saRushFee.toLocaleString() + ')'; color = 'text-amber-400'
                   } else {
-                    icon = '✅'; msg = 'Ready — est. issue ' + estStr + (state === 'SA' ? ' · Rush available*' : ''); color = 'text-emerald-400'
+                    const saRushFee = state === 'SA' ? (prize <= 10000 ? 270 : prize <= 50000 ? 955 : prize <= 100000 ? 1650 : 2800) : 0
+                    icon = '✅'; msg = 'Ready — est. issue ' + estStr + (state === 'SA' ? ' · Rush available* (+$' + saRushFee.toLocaleString() + ')' : ''); color = 'text-emerald-400'
                   }
                   return (
                     <div key={state} className="flex items-center gap-3">
@@ -588,7 +596,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
         <div className="shrink-0" onClick={e => e.stopPropagation()}>
           <CampaignLifecycleBar
             campaignId={campaign.id}
-            currentStatus={campaign.quotes?.some((q: any) => q.status === 'ACCEPTED') ? 'APPROVED' : (campaign.status ?? 'DRAFT')}
+            currentStatus={campaign.status ?? 'DRAFT'}
             campaign={campaign}
             compact
           />
@@ -645,7 +653,11 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                 ] as { id: TabId; label: string }[]).map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setMobileTabOpen(false) }}
+                    onClick={() => { 
+                      if (tab.id === 'prizes') { setShowPrizeWizard(true); setMobileTabOpen(false); return }
+                      if (tab.id === 'draw') { setShowDrawWizard(true); setMobileTabOpen(false); return }
+                      setActiveTab(tab.id); setMobileTabOpen(false) 
+                    }}
                     className={`w-full text-left px-4 py-3 text-sm font-semibold transition-all border-b border-white/[0.05] last:border-0 ${
                             activeTab === tab.id
                         ? 'text-black bg-lime-400'
@@ -673,7 +685,11 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
               { id: 'history',  label: 'History' },
               { id: 'support',  label: 'Support' },
             ] as { id: TabId; label: string }[]).map((tab, i, arr) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => {
+                if (tab.id === 'prizes') { setShowPrizeWizard(true); return }
+                if (tab.id === 'draw') { setShowDrawWizard(true); return }
+                setActiveTab(tab.id)
+              }}
               className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-all border-b-2 -mb-px shrink-0 ${
                 activeTab === tab.id
                     ? 'text-black bg-lime-400 border-lime-400 rounded-t-lg'
@@ -889,30 +905,40 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
               </div>
             </div>
             <div className="flex gap-3">
-            <div className="shrink-0" onClick={e => e.stopPropagation()}>
-              <CampaignLifecycleBar
-                campaignId={campaign.id}
-                currentStatus={campaign.quotes?.some((q: any) => q.status === 'ACCEPTED') ? 'APPROVED' : (campaign.status ?? 'DRAFT')}
-                campaign={campaign}
-                compact
-              />
-            </div>
-              
-              
-              
               <button onClick={() => window.open(`/dashboard/${id}/quote`, '_blank')}
-  className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-3 rounded-xl hover:bg-white/10 transition-all">
-  Export PDF
-</button>
-<button
-  onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
-  className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-3 rounded-xl hover:bg-white/10 transition-all">
-  Abbrev T&Cs
-</button>
-
-
-
-
+                className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-3 rounded-xl hover:bg-white/10 transition-all">
+                Export PDF
+              </button>
+              <button
+                onClick={() => window.open(`/dashboard/${id}/abbrev-terms`, '_blank')}
+                className="bg-white/[0.06] border border-white/[0.10] text-white text-sm font-semibold px-4 py-3 rounded-xl hover:bg-white/10 transition-all">
+                Abbrev T&Cs
+              </button>
+              {confirmedAt ? (
+                <div className="flex items-center gap-2 bg-emerald-400/10 border border-emerald-400/20 text-emerald-400 text-sm font-semibold px-4 py-3 rounded-xl">
+                  <span className="text-lg leading-none">✓</span>
+                  <span>Confirmed at {confirmedAt}</span>
+                </div>
+              ) : campaign.quotes?.some((q: any) => q.status === 'DRAFT' || q.status === 'ACCEPTED') && campaign.status !== 'CONFIRMED' ? (
+                <button
+                  disabled={confirming}
+                  onClick={async () => {
+                    setConfirming(true)
+                    try {
+                      await confirmQuote(campaign.id)
+                      const now = new Date()
+                      setConfirmedAt(now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' }) + ' ' + now.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }))
+                      router.refresh()
+                    } finally {
+                      setConfirming(false)
+                    }
+                  }}
+                  className="bg-white text-[#0a0a0f] font-black text-sm px-4 py-3 rounded-xl hover:bg-white/90 transition-all disabled:opacity-50 flex items-center gap-2">
+                  {confirming ? (
+                    <><span className="w-4 h-4 border-2 border-[#0a0a0f]/30 border-t-[#0a0a0f] rounded-full animate-spin inline-block" />Confirming...</>
+                  ) : 'Confirm and Proceed →'}
+                </button>
+              ) : null}
             </div>
           </div>
         )}
@@ -1359,9 +1385,12 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
            campaignId={campaign.id}
            existingPrizes={(campaign.confirmedPrizes ?? []).length > 0 ? (campaign.confirmedPrizes ?? []) : campaign.prizes}
            originalPrizePoolTotal={campaign.prizePoolTotal}
-           onConfirm={(prizes) => {
-             setCampaign(prev => prev ? { ...prev, confirmedPrizes: prizes, prizesConfirmed: true, prizePoolTotal: prizes.reduce((s, p) => s + p.qty * p.unitValue, 0) } : prev)
+           initialMaxStatePool={campaign.maxStatePool}
+           onConfirm={async (_prizes, _maxStatePool, _requiredPermits) => {
+             setCampaign(prev => prev ? { ...prev, maxStatePool: _maxStatePool } : prev)
              setShowPrizeWizard(false)
+             const fresh = await fetch(`/api/campaigns/${campaign.id}`).then(r => r.json())
+             setCampaign(normaliseCampaign(fresh))
            }}
            onClose={() => setShowPrizeWizard(false)}
          />
@@ -1371,17 +1400,17 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
        {showDrawWizard && (
          <DrawWizardModal
            campaignId={campaign.id}
-           campaignName={campaign.name}
-           tsCode={campaign.tsCode}
            promoStart={campaign.promoStart}
            promoEnd={campaign.promoEnd}
-           confirmedPrizes={(campaign.confirmedPrizes ?? []).length > 0 ? (campaign.confirmedPrizes ?? []) : campaign.prizes}
-           existingDrawSchedule={campaign.drawSchedule}
-           originalDrawFee={275}
-           mechanicType={campaign.mechanicType}
-           onConfirm={(schedule) => {
-             setCampaign(prev => prev ? { ...prev, drawSchedule: schedule, drawConfirmed: true } : prev)
+           drawFrequency={campaign.drawFrequency}
+           totalPrizePool={campaign.prizePoolTotal}
+           maxStatePool={campaign.maxStatePool}
+           existingDrawSchedule={campaign.drawSchedule ?? []}
+           originalDrawFee={(() => { const n = (campaign.drawSchedule ?? []).length; if (n <= 1) return 275; if (n <= 4) return 275 + (n - 1) * 125; return 275 + 3 * 125 + (n - 4) * 95; })()}
+           onConfirm={async (_schedule) => {
              setShowDrawWizard(false)
+             const fresh = await fetch(`/api/campaigns/${campaign.id}`).then(r => r.json())
+             setCampaign(normaliseCampaign(fresh))
            }}
            onClose={() => setShowDrawWizard(false)}
          />

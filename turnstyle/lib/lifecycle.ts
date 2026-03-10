@@ -23,12 +23,6 @@ export function getNextStepConfig(campaign: any): NextStepConfig | null {
       }
 
     case 'CONFIRMED': {
-      if (PRIZE_MECHANICS.includes(mechanic) && !campaign.prizesConfirmed) {
-        return { label: 'Confirm Prizes →', href: null, type: 'prize-wizard' }
-      }
-      if (DRAW_MECHANICS.includes(mechanic) && !campaign.drawConfirmed) {
-        return { label: 'Confirm Draw →', href: null, type: 'draw-wizard' }
-      }
       if (TERMS_MECHANICS.includes(mechanic)) {
         return { label: 'Build Terms →', href: `/dashboard/${campaign.id}?tab=terms`, type: 'link' }
       }
