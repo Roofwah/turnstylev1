@@ -1,6 +1,5 @@
 // app/api/campaigns/[id]/save-quote/route.ts
 // Saves a calculated quote to the DB so confirmQuote() can find it.
-// Called by the Express wizard when the user arrives at the Quote station.
 
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
@@ -31,7 +30,7 @@ export async function POST(
     }
 
     // Build a stable hash for upsert key
-    const quoteHash = `express-${campaignId}-${quoteNumber}`
+    const quoteHash = `quote-${campaignId}-${quoteNumber}`
 
     // Upsert: update if a DRAFT quote already exists, otherwise create
     const existing = await prisma.quote.findFirst({
