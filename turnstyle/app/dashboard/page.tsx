@@ -73,6 +73,7 @@ export default async function DashboardPage() {
           <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
           <div className="hidden md:flex items-center gap-6">
             <span className="text-white text-sm font-semibold">Campaigns</span>
+            <Link href="/dashboard/terms-test" className="text-white/60 hover:text-white text-sm transition-colors">Terms Test</Link>
             <span className="text-white/30 text-sm cursor-not-allowed">Templates</span>
             <span className="text-white/30 text-sm cursor-not-allowed">Reports</span>
           </div>
@@ -92,13 +93,21 @@ export default async function DashboardPage() {
             <h1 className="text-white font-black text-3xl mb-1">Campaigns</h1>
             <p className="text-white/40 text-sm">{campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}</p>
           </div>
-          <Link
-            href="/dashboard/new"
-            className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all flex items-center gap-2"
-          >
-            <span className="text-lg leading-none">+</span>
-            New Campaign
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/devflow"
+              className="text-white/50 hover:text-white text-sm font-semibold transition-colors"
+            >
+              Devflow
+            </Link>
+            <Link
+              href="/dashboard/new"
+              className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all flex items-center gap-2"
+            >
+              <span className="text-lg leading-none">+</span>
+              New Campaign
+            </Link>
+          </div>
         </div>
 
         {/* Campaign list */}

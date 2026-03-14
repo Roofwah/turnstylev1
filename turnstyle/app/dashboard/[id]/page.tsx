@@ -10,9 +10,9 @@ import { deleteCampaign } from '@/app/actions/deleteCampaign'
 import DrawScheduleTab from '@/components/DrawScheduleTab'
 import { DrawEvent } from '@/lib/draw-schedule'
 import { confirmQuote } from '@/app/actions/confirmQuote'
-import CampaignLifecycleBar from '@/components/CampaignLifecycleBar'
 import PrizeWizardModal from '@/components/PrizeWizardModal'
 import DrawWizardModal from '@/components/DrawWizardModal'
+import { getNextStepConfig } from '@/lib/lifecycle'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -504,6 +504,8 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
     countdownLabel = 'Awaiting draw'
   }
 
+  const nextStepConfig = getNextStepConfig(campaign)
+
   return (
     <>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
@@ -511,19 +513,30 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
           { label: 'Prize Pool',  value: formatMoney(prizePoolTotal) },
           { label: 'Promotion Type', value: campaign.drawMechanic || '—' },
           { label: 'Countdown', value: countdownLabel ?? '—' },
-          { label: 'Final Draw', value: ['LIMITED_OFFER','GAME_OF_SKILL','OTHER'].includes(campaign.mechanicType) ? '—' : campaign.mechanicType === 'DRAW_ONLY' && campaign.drawSchedule?.[0]?.drawDate ? new Date(campaign.drawSchedule[0].drawDate).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) : quote.finalDrawDate },
+          { label: 'Next Steps', isNextStep: true },
         ].map(m => (
           <div key={m.label} className={`bg-white/[0.03] border rounded-xl p-4 transition-all ${editing ? 'border-white/[0.10]' : 'border-white/[0.06]'}`}>
             <div className="text-white/40 text-xs font-semibold uppercase tracking-widest mb-1">{m.label}</div>
-            {m.label === 'Countdown' ? (
+            {(m as any).isNextStep ? (
+              nextStepConfig?.href ? (
+                <Link
+                  href={nextStepConfig.href}
+                  className="inline-block mt-1 bg-white text-[#0a0a0f] font-black text-sm px-4 py-2 rounded-lg hover:bg-white/90 transition-all"
+                >
+                  {nextStepConfig.label} →
+                </Link>
+              ) : (
+                <div className="text-white/40 text-sm mt-1">—</div>
+              )
+            ) : m.label === 'Countdown' ? (
               <div className={`font-black text-xl ${
                 startDays !== null && startDays <= 5 ? 'text-red-400' :
                 startDays !== null && startDays <= 10 ? 'text-amber-400' :
                 startDays !== null && startDays > 10 ? 'text-emerald-400' :
                 'text-white'
-              }`}>{m.value}</div>
+              }`}>{(m as any).value}</div>
             ) : (
-              <div className="text-white font-black text-xl">{m.value}</div>
+              <div className="text-white font-black text-xl">{(m as any).value}</div>
             )}
 {(m as any).sub && <div className="text-white/30 text-xs mt-0.5">{(m as any).sub}</div>}
           </div>
@@ -588,20 +601,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
         })()}
 {permitStates.length === 0 && ['SWEEPSTAKES','LIMITED_OFFER','INSTANT_WIN','GAME_OF_SKILL','DRAW_ONLY'].includes(campaign.mechanicType) && (
   <span className="text-white/20 text-xs">No permits required</span>
-)}  
-
-
-
-<div className="ml-auto">
-        <div className="shrink-0" onClick={e => e.stopPropagation()}>
-          <CampaignLifecycleBar
-            campaignId={campaign.id}
-            currentStatus={campaign.status ?? 'DRAFT'}
-            campaign={campaign}
-            compact
-          />
-        </div>
-      </div>
+)}
       </div>
     </>
   )

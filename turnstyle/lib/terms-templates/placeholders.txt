@@ -1,0 +1,23 @@
+Here are the {{VALUE}} placeholders the template wizard resolves (from AUTO_VARS in the terms wizard):
+
+Variable	Source	Description
+{{PROMOTER_NAME}}	Campaign → promoter name	Promoter’s display name
+{{PROMOTER_ABN}}	Campaign → promoter ABN	Promoter’s ABN
+{{PROMOTER_ADDRESS}}	Campaign → promoter address	Formatted address (street, suburb, state, postcode)
+{{PROMO_START}}	Campaign → promo start date	Promo start, long format (e.g. “Monday, 1 January 2024”)
+{{PROMO_END}}	Campaign → promo end date	Promo end, long format
+{{DRAW_MECHANIC}}	Campaign → mechanic type	e.g. “Trade Lottery”, “Limited Offer”, “Prize Draw”
+{{CAMPAIGN_URL}}	Derived	https://turnstylehost.com/campaign/{tsCode}/
+{{REGION}}	Campaign → regions	e.g. “throughout Australia” or “in NSW, VIC, QLD”
+{{ENTRY_MECHANIC}}	Campaign → entry mechanic	How to enter (e.g. “online form”, “trade account”)
+{{TOTAL_WINNERS}}	Campaign → prizes	Total number of winners (sum of prize quantities)
+{{DRAW_DATE}}	Derived from promo end	5th business day after promo end
+{{PRIZE_LIST}}	Campaign → prizes	Formatted list (qty × description, value)
+{{PRIZE_POOL}}	Campaign → prizes	Total prize pool, formatted (e.g. “$10,000.00”)
+{{UNCLAIMED_DEADLINE}}	Wizard answer (or derived)	60 days after promo end (e.g. “1 March 2024”)
+{{UNCLAIMED_REDRAW}}	Wizard answer (or derived)	Day after unclaimed deadline (redraw date)
+Notes
+
+{{UNCLAIMED_DEADLINE}} and {{UNCLAIMED_REDRAW}} are pre-filled from promo end but can be edited in the wizard (gap answers).
+Any {{KEY}} not in this list is left as [KEY] in the output.
+[[key]] (double brackets) are gap placeholders filled by wizard questions (e.g. [[NOTIFICATION_METHOD]], [[ADDITIONAL_ENTRIES]]), not from this auto-vars list.

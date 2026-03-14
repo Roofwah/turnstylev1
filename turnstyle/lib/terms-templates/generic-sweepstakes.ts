@@ -1,15 +1,16 @@
-export const REPCO_RETAIL = [
+export const GENERIC_SWEEPSTAKES = [
   {
     slug: 'promoter',
     label: 'Promoter',
-    text: `Repco Australia (A division of GPC Asia Pacific Pty Ltd (ABN 97 097 993 283) of 22 Enterprise Drive Rowville 3178 `,
+    text: `{{PROMOTER_NAME}} {{PROMOTER_ABN}} of {{PROMOTER_ADDRESS}} `,
   },
   {
     slug: 'promotion_period',
     label: 'Promotional Period',
-    text: `The Promotion commences at 12:00am (AEST) on {{PROMO_START}} and closes at 11:59pm (AEST) on {{PROMO_END}}.`,
+    text: `The Promotion commences at 12:00am (AEST) on {{PROMO_START}} and closes at 11:59pm (AEST) on {{PROMO_END}}.
+Entries received outside the Promotional Period will not be accepted.`,
   },
-{
+  {
     slug: 'acceptance',
     label: 'Acceptance of Terms',
     text: `Information on how to enter, details of the prizes being offered form part of these Terms and Conditions. Participation in this promotion is deemed as acceptance of these Terms and Conditions.`,
@@ -23,46 +24,44 @@ export const REPCO_RETAIL = [
   {
     slug: 'website',
     label: 'Website',
-text: `repco.com.au/win`,
+text: `[[WEBSITE]]`,
+gaps: [
+      {
+        key: 'WEBSITE',
+        question: 'What is the promotion website?',
+        placeholder: 'www.something.com/enter',
+      },
+    ],
   },
-  {
-    slug: 'eligibile',
-    label: 'Who Can enter?',
-    text: `Repco Rewards members who are Australian residents aged 16 years or older who comply with these Terms and Conditions.`,
+
+{
+    slug: 'eligible',
+    label: 'Who can enter?',
+    text: `Only Australian residents who: are aged [[AGE]] years or over.`,
+  gaps: [
+      {
+        key: 'AGE',
+        question: 'What is the minium age?',
+        placeholder: '18',
+      },
+    ],
   },
+
   {
-    slug: 'ineligibile',
+    slug: 'eligibility',
     label: 'Who is ineligible?',
     text: `Employees (and their immediate families) of the Promoter, participating retail stores and agencies associated with this promotion are ineligible to enter. Immediate family means any of the following: spouse, ex-spouse, de-facto spouse, child or step-child (whether natural or by adoption), parent, step-parent, grandparent, step-grandparent, uncle, aunt, niece, nephew, brother, sister, step-brother, step-sister or 1st cousin.
+
 Companies, businesses and organisations of any description are excluded from participating in this Promotion.
 `,
-  },
-{
-    slug: 'regions',
-    label: 'Where is it operating?',
-text: `The promotion will operate in all states and territories of Australia`,
   },
   {
     slug: 'how_to_enter',
     label: 'How to Enter',
-    text: `Entrants will receive one (1) entry into the draw for every $[[SPEND]] (incl. GST) spent on [[BRAND]] products in a single transaction, provided they present their Repco Rewards membership at the time of purchase in-store or complete the purchase online at repco.com.au using a valid Repco Rewards membership.
-Customers who are not Repco Rewards members may join the Repco Rewards program free of charge in-store or online at repco.com.au prior to making a qualifying purchase.
-Persons aged less than 18 years must have consent from a Parent or Guardian to register for Repco Rewards.
-The Promoter reserves the right to verify the validity of entries and to disqualify any entry that does not comply with these Terms and Conditions.
-All entries to this promotion are based on Repcos internal business systems. Multiple entries permitted provided they are inaccordance with the how to enter proces.
-`,
-    gaps: [
-      {
-        key: 'SPEND',
-        question: 'Qualifying spend amount (per entry)?',
-        placeholder: 'e.g. 50',
-      },
-      {
-        key: 'BRAND',
-        question: 'Participating Brand(s)?',
-        placeholder: 'e.g. Brand or Brands',
-      },
-    ],
+    text: `During the Promotional Period, eligible participants must complete the online entry form available at {{CAMPAIGN_URL}}, including all requested information, and submit the fully completed form.
+Entries must be submitted by an individual via the prescribed website and will not be accepted by any other means.
+The Promoter reserves the right to verify the validity of entries and to disqualify any entry that does not comply with these Terms and Conditions.`,
+           
   },
   {
     slug: 'prizes',
@@ -84,7 +83,7 @@ Additional entries may be drawn and recorded at the time of the original draw to
 The Promoter's decision is final and no correspondence will be entered into.`,
     
   },
-   {
+  {
     slug: 'notification',
     label: 'Winner Notification and Publication',
     text: `Winners will be notified by email within 5 business days of the draw.
@@ -106,18 +105,25 @@ Any prize awarded in the unclaimed prize draw that remains unclaimed after 14 DA
     text: `Entrants consent to the Promoter using their name, likeness, image and/or voice in the event they are a winner (including photograph, film and/or recording of the same) in any media for an unlimited period without remuneration for the purpose of promoting this promotion (including any outcome), and promoting any products manufactured, distributed and/or supplied by the Promoter.
 If for any reason this Promotion is not capable of running as planned, including without limitation due to technical failures, unauthorised intervention, fraud or causes beyond the Promoter's control, the Promoter reserves the right to cancel, terminate, modify or suspend the Promotion, subject to any required regulatory approval.
 The Promoter reserves the right, at any time, to verify the validity of entries and entrants (including their eligibility to enter) and to disqualify any entrant whose entry is not in accordance with these Terms and Conditions or who otherwise tampers with the entry process. Failure by the Promoter to enforce any of its rights at any stage does not constitute a waiver of those rights.
-Each participant must ensure the correct and legible contact information is provided during entry. Changes to contact information must be made to the Promoter prior to the end of the Promotional Period. See repco.com.au/privacy for details.
+Each participant must ensure the correct and legible contact information is provided during entry. Changes to contact information must be made to the Promoter prior to the end of the Promotional Period. See [[PRIVACY]] for details.
 Except for any liability that cannot be excluded by law, the Promoter and its agencies exclude all liability (including negligence) for any loss or damage (including loss of opportunity) arising in any way out of this Promotion or any prize.
 These Terms and Conditions are governed by the laws of Australia. Participants submit to the jurisdiction of the courts of the relevant State or Territory.
 The Promoter's decisions in relation to this Promotion are final and no correspondence or communication will be entered into in relation to any aspect of this Promotion.
-The Promoter (or third parties on its behalf) may collect personal information (PI) to conduct the Promotion and disclose such PI to third parties for this purpose, including agents, contractors, service providers and prize suppliers. Validity of an eligible entrant's entry is conditional on providing this information. The Promoter may, for an indefinite period unless otherwise advised, use the information for promotional, marketing, publicity, research and profiling purposes, including sending electronic messages or telephoning the participant. All eligible entrants consent to their PI being collected and stored for this purpose in accordance with the Promoter's privacy policy available at repco.com.au/privacy which forms part of these T&Cs.  The Privacy Policy also contains information about how Eligible Entrants may opt out, access, update or correct their PI, how Eligible Entrants may complain about a breach of the Australian Privacy Principles or any other applicable law and how those complaints will be dealt with. All entries become the property of the Promoter.`,
-    
+The Promoter (or third parties on its behalf) may collect personal information (PI) to conduct the Promotion and disclose such PI to third parties for this purpose, including agents, contractors, service providers and prize suppliers. Validity of an eligible entrant's entry is conditional on providing this information. The Promoter may, for an indefinite period unless otherwise advised, use the information for promotional, marketing, publicity, research and profiling purposes, including sending electronic messages or telephoning the participant. All eligible entrants consent to their PI being collected and stored for this purpose in accordance with the Promoter's privacy policy available at [[PRIVACY]] which forms part of these T&Cs.  The Privacy Policy also contains information about how Eligible Entrants may opt out, access, update or correct their PI, how Eligible Entrants may complain about a breach of the Australian Privacy Principles or any other applicable law and how those complaints will be dealt with. All entries become the property of the Promoter.`,
+    gaps: [
+      {
+        key: 'PRIVACY',
+        question: 'Website / privacy URL?',
+        placeholder: 'e.g. https://example.com/privacy',
+      },
+    ],
   },
 ]
 
+
 export const TEMPLATE_META = {
-  id: 'repco-retail',
-  name: 'Repco Retail',
-  promoterKeyword: 'repco',
+  id: 'generic-sweepstakes',
+  name: 'Generic Sweepstakes',
+  promoterKeyword: null,
   audience: 'b2c',
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { getCampaign } from '@/app/actions/getCampaign'
 import Link from 'next/link'
-import { getTemplatesForCampaign, getAllTemplates, type TemplateEntry } from '@/lib/terms-templates'
+import { getTemplatesForCampaign, getAllTemplates, mergeSubTemplatesIntoClauses, type TemplateEntry } from '@/lib/terms-templates'
 import { useNotify } from '@/components/useNotify'
 
 // Template registry
@@ -32,6 +32,7 @@ interface Gap {
   optionLabels?: string[]
   placeholder?: string
   multiline?: boolean
+  multiple?: boolean
   followUp?: GapFollowUp
 }
 
@@ -153,6 +154,17 @@ export default function TermsWizardPage() {
     setAnswers(prev => ({ ...prev, [key]: value }))
   }
 
+  function toggleMultiAnswer(key: string, value: string) {
+    setAnswers(prev => {
+      const current = prev[key]
+      const arr = Array.isArray(current) ? [...current] : []
+      const i = arr.indexOf(value)
+      if (i >= 0) arr.splice(i, 1)
+      else arr.push(value)
+      return { ...prev, [key]: arr }
+    })
+  }
+
   useEffect(() => {
     getCampaign(id).then(async raw => {
       if (raw) {
@@ -188,12 +200,18 @@ export default function TermsWizardPage() {
   }
 
   const currentTemplate = (
-    availableTemplates.find(t => t.meta.id === selectedTemplate) 
-    ?? availableTemplates[0] 
+    availableTemplates.find(t => t.meta.id === selectedTemplate)
+    ?? availableTemplates[0]
     ?? getAllTemplates()[0]
   )
   const templateMeta = currentTemplate?.meta
-  const currentClauses = currentTemplate?.clauses ?? []
+  const baseClauses = currentTemplate?.clauses ?? []
+  const selectedSubTemplateIds = useMemo(() => {
+    const v = answers.PRIZE_TYPES
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []
+  }, [answers])
+  const currentClauses = mergeSubTemplatesIntoClauses(baseClauses, selectedSubTemplateIds, { insertAfterSlug: 'prizes' })
+  const clausesForDocument = useMemo(() => currentClauses.filter((c: Clause) => c.slug !== 'sub_template_choice'), [currentClauses])
 
   const allQuestions: Question[] = useMemo(() => {
     const questions: Question[] = []
@@ -309,9 +327,11 @@ export default function TermsWizardPage() {
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1
   const currentAnswer = currentQuestion ? answers[currentQuestion.gap.key] : undefined
   const canProceed = currentQuestion
-    ? (isFullGap(currentQuestion.gap) && currentQuestion.gap.options
-        ? currentAnswer !== undefined
-        : currentAnswer !== undefined && String(currentAnswer).trim() !== '')
+    ? (currentQuestion.gap as Gap).multiple
+        ? true
+        : (isFullGap(currentQuestion.gap) && currentQuestion.gap.options
+            ? currentAnswer !== undefined
+            : currentAnswer !== undefined && String(currentAnswer).trim() !== '')
     : false
 
   function handleNext() {
@@ -336,7 +356,7 @@ export default function TermsWizardPage() {
   async function saveAndShare() {
     if (!campaign) return
     setSharing(true)
-    const content = currentClauses.map((clause: Clause) => {
+    const content = clausesForDocument.map((clause: Clause) => {
       const { resolved } = resolveText(clause.text)
       return `${clause.label}\n\n${resolved}`
     }).join('\n\n---\n\n')
@@ -518,7 +538,34 @@ export default function TermsWizardPage() {
                 <h3 className="text-white font-bold text-lg mb-6">{currentQuestion.gap.question}</h3>
 
                 <div className="space-y-4">
-                  {isFullGap(currentQuestion.gap) && currentQuestion.gap.options && currentQuestion.gap.options.length > 0 ? (
+                  {isFullGap(currentQuestion.gap) && currentQuestion.gap.options && currentQuestion.gap.options.length > 0 && (currentQuestion.gap as Gap).multiple ? (
+                    <div className="flex flex-col gap-3">
+                      {(() => {
+                        const gap = currentQuestion.gap as Gap
+                        const selected = Array.isArray(currentAnswer) ? currentAnswer : []
+                        return gap.options!.map((opt: string, i: number) => {
+                          const label = (gap.optionLabels?.[i] ?? opt) || String(i)
+                          const isSelected = selected.includes(opt)
+                          return (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => toggleMultiAnswer(gap.key, opt)}
+                              className={`px-6 py-4 rounded-xl text-left border-2 transition-all flex items-center gap-3 ${
+                                isSelected
+                                  ? 'bg-white text-[#0a0a0f] border-white font-bold'
+                                  : 'bg-white/5 border-white/10 text-white/60 hover:border-white/20 hover:text-white'
+                              }`}>
+                              <span className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-[#0a0a0f] border-[#0a0a0f]' : 'border-white/40'}`}>
+                                {isSelected && <span className="text-white text-xs">✓</span>}
+                              </span>
+                              {label}
+                            </button>
+                          )
+                        })
+                      })()}
+                    </div>
+                  ) : isFullGap(currentQuestion.gap) && currentQuestion.gap.options && currentQuestion.gap.options.length > 0 ? (
                     <div className="flex flex-col gap-3">
                       {(() => {
                         const gap = currentQuestion.gap as Gap
@@ -611,8 +658,8 @@ export default function TermsWizardPage() {
               <div className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-400 border-l border-gray-100">Details</div>
             </div>
 
-            {currentClauses.length > 0 ? (
-              currentClauses.map((clause, ci) => {
+            {clausesForDocument.length > 0 ? (
+              clausesForDocument.map((clause, ci) => {
                 const { resolved, hasUnfilledGaps } = resolveText(clause.text)
                 return (
                   <div key={clause.slug} className={`grid grid-cols-[220px_1fr] border-b border-gray-100 last:border-0 ${ci % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
