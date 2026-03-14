@@ -1,9 +1,17 @@
 'use server'
 
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
-async function serializeCampaign(raw: NonNullable<Awaited<ReturnType<typeof prisma.campaign.findUnique>>>) {
-  if (!raw) return null
+const campaignInclude = {
+  promoter: true,
+  quotes: { orderBy: { createdAt: 'desc' as const }, take: 1 },
+  auditLogs: { orderBy: { createdAt: 'desc' as const }, take: 10 },
+} as const
+
+type RawCampaign = Prisma.CampaignGetPayload<{ include: typeof campaignInclude }>
+
+async function serializeCampaign(raw: RawCampaign) {
   return {
     ...raw,
     prizePoolTotal: Number(raw.prizePoolTotal),
@@ -11,7 +19,7 @@ async function serializeCampaign(raw: NonNullable<Awaited<ReturnType<typeof pris
     promoEnd: raw.promoEnd?.toISOString() ?? null,
     createdAt: raw.createdAt.toISOString(),
     updatedAt: raw.updatedAt.toISOString(),
-    quotes: raw.quotes?.map((q: any) => ({
+    quotes: raw.quotes.map((q) => ({
       ...q,
       totalExGst: Number(q.totalExGst),
       totalIncGst: Number(q.totalIncGst),
@@ -22,30 +30,19 @@ async function serializeCampaign(raw: NonNullable<Awaited<ReturnType<typeof pris
       drawFee: Number(q.drawFee),
       validUntil: q.validUntil?.toISOString(),
       createdAt: q.createdAt?.toISOString(),
-    })) ?? [],
-    auditLogs: raw.auditLogs?.map((a: any) => ({
+    })),
+    auditLogs: raw.auditLogs.map((a) => ({
       ...a,
       createdAt: a.createdAt?.toISOString(),
-    })) ?? [],
+    })),
   }
 }
 
 export async function getCampaign(id: string) {
   const raw = await prisma.campaign.findUnique({
     where: { id },
-    include: {
-      promoter: true,
-      quotes: {
-        orderBy: { createdAt: 'desc' },
-        take: 1,
-      },
-      auditLogs: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      },
-    },
+    include: campaignInclude,
   })
-
   if (!raw) return null
   return serializeCampaign(raw)
 }
@@ -54,12 +51,8 @@ export async function getCampaign(id: string) {
 export async function getCampaignByTsCode(tsCode: string) {
   const raw = await prisma.campaign.findFirst({
     where: { tsCode: tsCode.trim().toUpperCase() },
-    include: {
-      promoter: true,
-      quotes: { orderBy: { createdAt: 'desc' }, take: 1 },
-      auditLogs: { orderBy: { createdAt: 'desc' }, take: 10 },
-    },
+    include: campaignInclude,
   })
   if (!raw) return null
-  return serializeCampaign(raw as any)
+  return serializeCampaign(raw)
 }
