@@ -375,14 +375,23 @@ export default function BuildFormPage() {
   async function handleSubmit() {
     setSaving(true)
     if (isDrawOnly) {
+      const draws =
+        drawsConfirmed && confirmedDrawSchedule.length > 0
+          ? confirmedDrawSchedule.map((d: { drawDate?: string; date?: string; drawTime?: string; time?: string; winners?: number }) => ({
+              drawDate: d.drawDate || d.date || '',
+              drawTime: d.drawTime || d.time || '12:00',
+              winners: Number(d.winners) || 1,
+            }))
+          : [{ drawDate: drawOnly.drawDate, drawTime: drawOnly.drawTime, winners: 1 }]
       await createDrawOnlyCampaign({
-        ...drawOnly,
         promoterName: form.promoterName,
         promoterAbn: form.promoterAbn,
         contactName: form.contactName,
         contactEmail: form.contactEmail,
         promoterAddress: form.promoterAddress,
-        campaignName: form.campaignName,
+        campaignName: drawOnly.campaignName,
+        draws,
+        prizes: drawOnly.prizes,
       })
     } else {
       await createCampaign({

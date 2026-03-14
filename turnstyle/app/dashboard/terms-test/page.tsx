@@ -123,7 +123,7 @@ export default function TermsTestPage() {
   const [error, setError] = useState<string | null>(null)
   const [availableTemplates, setAvailableTemplates] = useState<TemplateEntry[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
-  const [answers, setAnswers] = useState<Record<string, string | number>>({})
+  const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({})
 
   function answer(key: string, value: string | number) {
     setAnswers(prev => ({ ...prev, [key]: value }))
@@ -357,11 +357,11 @@ export default function TermsTestPage() {
                   <label className="block text-white/70 text-xs font-medium">
                     {i + 1}. {q.gap.question}
                   </label>
-                  {(q.gap as Gap).multiple && q.gap.options && q.gap.options.length > 0 ? (
+                  {isFullGap(q.gap) && q.gap.multiple && q.gap.options && q.gap.options.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {q.gap.options.map((opt: string, j: number) => {
+                      {(q.gap as Gap).options!.map((opt: string, j: number) => {
                         const label = (q.gap as Gap).optionLabels?.[j] ?? opt
-                        const selected = Array.isArray(answers[q.gap.key]) ? answers[q.gap.key] : []
+                        const selected: string[] = Array.isArray(answers[q.gap.key]) ? (answers[q.gap.key] as string[]) : []
                         const isSelected = selected.includes(opt)
                         return (
                           <button
@@ -382,7 +382,7 @@ export default function TermsTestPage() {
                     </div>
                   ) : isFullGap(q.gap) && q.gap.options && q.gap.options.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {q.gap.options.map((opt: string, j: number) => {
+                      {(q.gap as Gap).options!.map((opt: string, j: number) => {
                         const label = (q.gap as Gap).optionLabels?.[j] ?? opt
                         const isSelected = String(answers[q.gap.key]) === String(j)
                         return (

@@ -138,7 +138,7 @@ export default function TermsWizardPage() {
   const [campaign, setCampaign] = useState<any>(null)
   const [loading, setLoading]   = useState(true)
   const [availableTemplates, setAvailableTemplates] = useState<TemplateEntry[]>([])
-  const [answers, setAnswers] = useState<Record<string, string | number>>({})
+  const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({})
   const [sharing, setSharing]     = useState(false)
   const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
   const isReadonly = searchParams?.get('readonly') === 'true'
@@ -180,7 +180,7 @@ export default function TermsWizardPage() {
           const drafts = await res.json()
           if (Array.isArray(drafts) && drafts.length > 0) {
             const latest = drafts[0]
-            const savedAnswers = latest.gapAnswers as Record<string, string | number>
+            const savedAnswers = latest.gapAnswers as Record<string, string | number | string[]>
             setAnswers(prev => ({ ...prev, ...savedAnswers }))
             setShareLink(`${window.location.origin}/review/${latest.shareToken}`)
             setDraftVersion(latest.version)
