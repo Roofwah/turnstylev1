@@ -88,24 +88,25 @@ export default async function DashboardPage() {
 
       <main className="max-w-6xl mx-auto px-6 py-10">
         {/* Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-white font-black text-3xl mb-1">Campaigns</h1>
+            <h1 className="text-white font-black text-2xl sm:text-3xl mb-1">Campaigns</h1>
             <p className="text-white/40 text-sm">{campaigns.length} campaign{campaigns.length !== 1 ? 's' : ''}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <Link
               href="/dashboard/devflow"
-              className="text-white/50 hover:text-white text-sm font-semibold transition-colors"
+              className="text-white/50 hover:text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
             >
               Devflow
             </Link>
             <Link
               href="/dashboard/new"
-              className="bg-white text-[#0a0a0f] font-black text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-all flex items-center gap-2"
+              className="bg-white text-[#0a0a0f] font-black text-xs sm:text-sm px-3 py-2 sm:px-5 sm:py-2.5 rounded-lg sm:rounded-xl hover:bg-white/90 transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap"
             >
-              <span className="text-lg leading-none">+</span>
-              New Campaign
+              <span className="text-base sm:text-lg leading-none">+</span>
+              <span className="hidden sm:inline">New Campaign</span>
+              <span className="sm:hidden">New</span>
             </Link>
           </div>
         </div>
@@ -116,7 +117,7 @@ export default async function DashboardPage() {
             <p className="text-white/30 text-sm mb-4">No campaigns yet</p>
             <Link
               href="/dashboard/new"
-              className="bg-white text-[#0a0a0f] font-black text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-all inline-block"
+              className="bg-white text-[#0a0a0f] font-black text-xs sm:text-sm px-4 py-2 sm:px-6 sm:py-2.5 rounded-lg sm:rounded-xl hover:bg-white/90 transition-all inline-block"
             >
               Create your first campaign
             </Link>

@@ -429,9 +429,9 @@ export default function DevflowPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f]">
+    <div className="min-h-screen bg-[#0a0a0f] overflow-x-hidden w-full">
       <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/95 backdrop-blur-sm z-10">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
             <Link href="/dashboard" className="text-white/40 hover:text-white text-sm">← Dashboard</Link>
@@ -441,7 +441,7 @@ export default function DevflowPage() {
         </div>
       </nav>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 py-8 min-w-0 w-full">
         {/* Step progress */}
         <div className="mb-10">
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -457,7 +457,7 @@ export default function DevflowPage() {
           <div className="space-y-8 animate-in fade-in duration-200">
             <section>
               <h2 className="text-white font-bold text-sm uppercase tracking-widest opacity-70 mb-4">Contact</h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClass}>Name</label>
                   <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Your name" className={inputClass} />
@@ -584,8 +584,8 @@ export default function DevflowPage() {
             <h2 className="text-white font-bold text-sm uppercase tracking-widest opacity-70 mb-4">Draw schedule</h2>
             <div className="space-y-4">
               {draws.map((d, i) => (
-                <div key={i} className="flex flex-wrap items-end gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                  <div className="flex-1 min-w-[140px]">
+                <div key={i} className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-end gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                  <div className="flex-1 min-w-0 sm:min-w-[140px]">
                     <DatePickerField
                       label="Date"
                       value={d.date}
@@ -597,17 +597,19 @@ export default function DevflowPage() {
                       formatDisplay={formatLongDate}
                     />
                   </div>
-                  <div className="w-32 shrink-0">
-                    <label className={labelClass}>Time</label>
-                    <input type="time" value={d.time} onChange={e => updateDraw(i, 'time', e.target.value)} className={inputClass} />
+                  <div className="flex gap-3 sm:gap-3">
+                    <div className="w-28 sm:w-32 shrink-0">
+                      <label className={labelClass}>Time</label>
+                      <input type="time" value={d.time} onChange={e => updateDraw(i, 'time', e.target.value)} className={inputClass} />
+                    </div>
+                    <div className="w-20 shrink-0">
+                      <label className={labelClass}>Winners</label>
+                      <input type="number" min={1} value={d.winners} onChange={e => updateDraw(i, 'winners', Number(e.target.value) || 1)} className={inputClass} />
+                    </div>
+                    {draws.length > 1 && (
+                      <button type="button" onClick={() => removeDraw(i)} className="shrink-0 p-2 text-white/40 hover:text-red-400 transition-colors self-end" aria-label="Remove draw">×</button>
+                    )}
                   </div>
-                  <div className="w-20 shrink-0">
-                    <label className={labelClass}>Winners</label>
-                    <input type="number" min={1} value={d.winners} onChange={e => updateDraw(i, 'winners', Number(e.target.value) || 1)} className={inputClass} />
-                  </div>
-                  {draws.length > 1 && (
-                    <button type="button" onClick={() => removeDraw(i)} className="shrink-0 p-2 text-white/40 hover:text-red-400 transition-colors" aria-label="Remove draw">×</button>
-                  )}
                 </div>
               ))}
               <div className="flex items-center gap-3">
@@ -622,7 +624,7 @@ export default function DevflowPage() {
         ) : (
           <section>
             <h2 className="text-white font-bold text-sm uppercase tracking-widest opacity-70 mb-4">Dates</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <DatePickerField
                   label="Promo start"
@@ -910,7 +912,7 @@ export default function DevflowPage() {
                     <p className="text-red-300/80 text-xs mt-1">One or more required permits cannot be issued in time. Change promo start to allow enough business days.</p>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 px-4 py-3 border-b border-white/[0.08] text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 px-4 py-3 border-b border-white/[0.08] text-sm">
                   <div>
                     <span className="text-white/40">Campaign name</span>
                     <p className="text-white font-medium">{campaignName || '—'}</p>
@@ -1067,7 +1069,7 @@ export default function DevflowPage() {
         )}
 
         {/* Step navigation */}
-        <footer className="max-w-2xl mx-auto px-6 pt-8 pb-12 flex items-center justify-between gap-4 border-t border-white/[0.08] mt-10">
+        <footer className="max-w-2xl mx-auto px-4 sm:px-6 pt-8 pb-12 flex items-center justify-between gap-4 border-t border-white/[0.08] mt-10">
           <button
             type="button"
             onClick={goBack}
