@@ -142,7 +142,7 @@ try {
   console.error('[email] Failed to send draft email:', e)
 
 }
-redirect(`/dashboard/${campaign.id}`)
+redirect(`/dashboard/lite/${campaign.id}?created=1`)
 
 }
 export async function createDrawOnlyCampaign(data: {
@@ -152,11 +152,13 @@ export async function createDrawOnlyCampaign(data: {
   contactEmail: string
   promoterAddress: string
   campaignName: string
-  drawDate: string
-  drawTime: string
+  draws: { drawDate: string; drawTime: string; winners: number }[]
   prizes: { tier: string; description: string; qty: number; unitValue: number }[]
 }) {
   const prizePoolTotal = data.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
+  const draws = data.draws.length ? data.draws : [{ drawDate: '', drawTime: '12:00', winners: 1 }]
+  const validDraws = draws.filter(d => d.drawDate && d.drawTime)
+  if (!validDraws.length) throw new Error('At least one draw with date and time is required')
 
   // Create promoter
   const promoterId = require('crypto').randomUUID()
@@ -194,8 +196,18 @@ export async function createDrawOnlyCampaign(data: {
     exists = !!existing
   }
 
-  // Draw date/time combined
-  const drawDateTime = new Date(`${data.drawDate}T${data.drawTime}:00`)
+  const firstDraw = new Date(`${validDraws[0].drawDate}T${validDraws[0].drawTime}:00`)
+  const lastDraw = new Date(`${validDraws[validDraws.length - 1].drawDate}T${validDraws[validDraws.length - 1].drawTime}:00`)
+  const drawSchedule = validDraws.map((d, i) => ({
+    id: `major-${i + 1}`,
+    name: validDraws.length > 1 ? `Draw ${i + 1}` : 'Draw',
+    type: 'major' as const,
+    winners: Math.max(1, Number(d.winners) || 1),
+    drawDate: d.drawDate,
+    drawTime: d.drawTime,
+    periodStart: d.drawDate,
+    periodEnd: d.drawDate,
+  }))
 
   const campaign = await prisma.campaign.create({
     data: {
@@ -203,8 +215,8 @@ export async function createDrawOnlyCampaign(data: {
       promoterId,
       createdById: adminUser.id,
       name: data.campaignName,
-      promoStart: drawDateTime,
-      promoEnd: drawDateTime,
+      promoStart: firstDraw,
+      promoEnd: lastDraw,
       drawFrequency: 'AT_CONCLUSION',
       entryMechanic: null,
       regions: ['national_au'],
@@ -213,25 +225,13 @@ export async function createDrawOnlyCampaign(data: {
       notes: null,
       mechanicType: 'DRAW_ONLY',
       status: 'DRAFT',
-      // Store draw date/time for PureRandom sync
-      drawSchedule: [
-        {
-          id: 'major-1',
-          name: 'Draw',
-          type: 'major',
-          winners: 1,
-          drawDate: data.drawDate,
-          drawTime: data.drawTime,
-          periodStart: data.drawDate,
-          periodEnd: data.drawDate,
-        }
-      ],
+      drawSchedule,
     },
   })
 
   // Create Draw Only quote
   const { calcDrawFee } = await import('@/lib/quote-engine')
-  const drawFee = calcDrawFee(1)
+  const drawFee = calcDrawFee(validDraws.length)
   const mgmtFee = 100
   const totalExGst = drawFee + mgmtFee
   const gstAmount = Math.round(totalExGst * 0.1 * 100) / 100
@@ -268,13 +268,13 @@ export async function createDrawOnlyCampaign(data: {
       tsCode:         campaign.tsCode,
       promoterName:   data.promoterName,
       promoterEmail:  data.contactEmail,
-      promoStart:     data.drawDate,
-      promoEnd:       data.drawDate,
+      promoStart:     validDraws[0].drawDate,
+      promoEnd:       validDraws[validDraws.length - 1].drawDate,
       prizePoolTotal: totalIncGst,
     })
   } catch (e) {
     console.error('[email] Failed to send draw only draft email:', e)
   }
 
-  redirect(`/dashboard/${campaign.id}`)
+  redirect(`/dashboard/lite/${campaign.id}?created=1`)
 }

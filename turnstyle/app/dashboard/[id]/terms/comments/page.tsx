@@ -61,6 +61,7 @@ export default function TermsCommentsPage() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
 
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const documentPanelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -115,6 +116,23 @@ export default function TermsCommentsPage() {
       text: editedTexts[cl.slug] ?? labelToText[cl.label] ?? '',
     }))
   }, [draft, currentTemplate, editedTexts])
+
+  // Resize textareas to fit content on initial load and when sections change
+  useEffect(() => {
+    if (sections.length === 0) return
+    const el = documentPanelRef.current
+    if (!el) return
+    const run = () => {
+      el.querySelectorAll('textarea').forEach((ta: Element) => {
+        const t = ta as HTMLTextAreaElement
+        t.style.minHeight = '0'
+        t.style.height = '0'
+        t.style.height = t.scrollHeight + 'px'
+      })
+    }
+    const id = setTimeout(run, 0)
+    return () => clearTimeout(id)
+  }, [sections])
 
   const openComments = comments.filter(c => c.status === 'OPEN')
   const resolvedComments = comments.filter(c => c.status === 'RESOLVED')
@@ -289,9 +307,54 @@ export default function TermsCommentsPage() {
         </div>
       )}
 
-      <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[0.4fr_0.6fr] gap-6">
-        {/* Left: comments list */}
-        <section className="space-y-4">
+      <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[0.7fr_0.3fr] gap-6">
+        {/* Left: document (70%) */}
+        <section className="bg-white rounded-2xl overflow-hidden shadow-xl text-sm text-gray-800 lg:order-1">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <div className="text-gray-400 text-xs font-semibold uppercase tracking-widest">Terms &amp; Conditions</div>
+              <div className="text-gray-900 font-black text-lg mt-0.5">Comments Resolution</div>
+            </div>
+            {draft && <div className="text-gray-400 text-xs">Draft v{draft.version}</div>}
+          </div>
+
+          {sections.length === 0 ? (
+            <div className="p-6 text-gray-400 text-sm">No terms content found.</div>
+          ) : (
+            <div ref={documentPanelRef} className="divide-y divide-gray-100 max-h-[calc(100vh-220px)] overflow-y-auto">
+              {sections.map(sec => {
+                const isHighlighted = sec.slug === selectedSlug
+                return (
+                  <div
+                    key={sec.slug}
+                    ref={el => { sectionRefs.current[sec.slug] = el }}
+                    className={`flex flex-col px-6 py-4 ${
+                      isHighlighted ? 'bg-amber-50 border-l-4 border-amber-400' : 'bg-white'
+                    }`}
+                  >
+                    <div className="text-gray-900 font-semibold text-sm mb-2">{sec.label}</div>
+                    <textarea
+                      value={sec.text}
+                      onChange={e => handleChangeClauseText(sec.slug, e.target.value)}
+                      onInput={e => {
+                        const el = e.target as HTMLTextAreaElement
+                        el.style.minHeight = '0'
+                        el.style.height = '0'
+                        el.style.height = el.scrollHeight + 'px'
+                      }}
+                      rows={1}
+                      style={{ minHeight: '1.5rem', resize: 'none', lineHeight: '1.375' }}
+                      className="w-full text-gray-800 text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400 overflow-hidden"
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Right: comments list (30%) */}
+        <section className="space-y-4 lg:order-2">
           <div className="flex items-center gap-2 border-b border-white/10 pb-2">
             {(['ALL', 'OPEN', 'RESOLVED'] as const).map(key => (
               <button
@@ -344,7 +407,7 @@ export default function TermsCommentsPage() {
                   </div>
 
                   <div className="mt-2 text-amber-300 text-xs font-semibold">
-                    Clause: {comment.clauseSlug}
+                    {comment.clauseSlug}
                   </div>
 
                   <div className={`mt-2 text-xs ${isResolved ? 'text-white/30 line-through' : 'text-white/80'}`}>
@@ -376,49 +439,6 @@ export default function TermsCommentsPage() {
                 </div>
               )
             })
-          )}
-        </section>
-
-        {/* Right: document */}
-        <section className="bg-white rounded-2xl overflow-hidden shadow-xl text-sm text-gray-800">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-            <div>
-              <div className="text-gray-400 text-xs font-semibold uppercase tracking-widest">Terms &amp; Conditions</div>
-              <div className="text-gray-900 font-black text-lg mt-0.5">Comments Resolution</div>
-            </div>
-            {draft && <div className="text-gray-400 text-xs">Draft v{draft.version}</div>}
-          </div>
-
-          {sections.length === 0 ? (
-            <div className="p-6 text-gray-400 text-sm">No terms content found.</div>
-          ) : (
-            <div className="divide-y divide-gray-100 max-h-[calc(100vh-220px)] overflow-y-auto">
-              {sections.map(sec => {
-                const isHighlighted = sec.slug === selectedSlug
-                return (
-                  <div
-                    key={sec.slug}
-                    ref={el => { sectionRefs.current[sec.slug] = el }}
-                    className={`grid grid-cols-[220px_1fr] ${
-                      isHighlighted ? 'bg-amber-50 border-l-4 border-amber-400' : 'bg-white'
-                    }`}
-                  >
-                    <div className="px-6 py-4 border-gray-100">
-                      <div className="text-gray-500 text-xs font-semibold uppercase tracking-widest">Clause</div>
-                      <div className="text-gray-900 font-semibold mt-1">{sec.label}</div>
-                    </div>
-                    <div className="px-6 py-4 border-l border-gray-100">
-                      <textarea
-                        value={sec.text}
-                        onChange={e => handleChangeClauseText(sec.slug, e.target.value)}
-                        rows={4}
-                        className="w-full text-gray-800 text-sm leading-relaxed border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-amber-400"
-                      />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
           )}
         </section>
 
