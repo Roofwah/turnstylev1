@@ -319,6 +319,8 @@ export default function TermsWizardPage() {
   const [showDocument, setShowDocument] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
   const [draftVersion, setDraftVersion] = useState<number | null>(null)
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   // Preflight state
   const [preflightLoading, setPreflightLoading] = useState(false)
@@ -582,6 +584,7 @@ export default function TermsWizardPage() {
       const link = `${window.location.origin}/review/${draft.shareToken}`
       setShareLink(link)
       setDraftVersion(draft.version)
+      setDraftId(draft.id)
 
       if (campaign.id) {
         const campaignRes = await fetch(`/api/campaigns/${campaign.id}`)
@@ -622,6 +625,41 @@ export default function TermsWizardPage() {
     } finally {
       setPreflightLoading(false)
     }
+  }
+
+  async function handleSubmit() {
+    if (!campaign?.id) return
+    modal({
+      title: 'Submit Terms for Processing',
+      message: 'Once submitted, these terms cannot be modified. The campaign will move to Pending status and Flow Marketing will begin processing. Are you sure you want to proceed?',
+      confirmLabel: 'Submit Terms',
+      onConfirm: async () => {
+        setSubmitting(true)
+        try {
+          // Save terms first if not already saved
+          if (!draftId) await saveAndShare()
+
+          // Move campaign to PENDING using force to bypass approval prerequisite
+          // Works from any status — CONFIRMED, COMPILED, REVIEW etc.
+          const res = await fetch(`/api/campaigns/${campaign.id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'PENDING', force: true }),
+          })
+
+          if (!res.ok) {
+            const data = await res.json()
+            throw new Error(data.error ?? 'Failed to submit')
+          }
+
+          toast('Terms submitted — campaign is now Pending')
+        } catch (e: any) {
+          toast(`Submission failed: ${e.message}`, 'error')
+        } finally {
+          setSubmitting(false)
+        }
+      },
+    })
   }
 
   function handleEditAnswers() {
@@ -692,6 +730,14 @@ export default function TermsWizardPage() {
               onClick={saveAndShare}
               className="bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-emerald-400 transition-all disabled:opacity-50">
               {sharing ? 'Saving...' : 'Save'}
+            </button>
+            )}
+            {!isReadonly && draftId && (
+            <button
+              disabled={submitting}
+              onClick={handleSubmit}
+              className="bg-white text-[#0a0a0f] font-black text-xs px-3 py-1.5 rounded-lg hover:bg-white/90 transition-all disabled:opacity-50">
+              {submitting ? 'Submitting...' : 'Submit →'}
             </button>
             )}
             {isReadonly && (
