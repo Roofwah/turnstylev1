@@ -416,7 +416,7 @@ export default function TermsTestPage() {
 
       const result = await preflightCampaign(campaign.id, fullTerms, answers)
       if ('error' in result) {
-        setPreflightError(result.error)
+        setPreflightError(String(result.error))
         return
       }
       setPreflightReport(result.report)
