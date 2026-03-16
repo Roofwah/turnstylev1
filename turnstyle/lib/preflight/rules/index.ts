@@ -9,7 +9,7 @@ import {
   TermsDocument,
   PreflightIssue,
   ClauseType,
-} from './types'
+} from '../types'
 import { getClauseBody } from '../classifier'
 
 type RuleFn = (
