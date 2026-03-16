@@ -4,6 +4,34 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { QuoteStatus, CampaignStatus } from '@prisma/client'
 
+// ─── Permit calculation ───────────────────────
+// Mirrors the permitReadiness logic in Devflow page
+// Thresholds: ACT > $3,000 | SA > $5,000 | NSW > $10,000
+
+function calcRequiredPermits(
+  regions: string[],
+  prizePoolTotal: number,
+  mechanicType: string
+): { requiredPermits: string[]; maxStatePool: number } {
+  // Only sweepstakes and instant win require permits
+  const noPermit = ['LIMITED_OFFER', 'GAME_OF_SKILL', 'OTHER', 'DRAW_ONLY'].includes(mechanicType)
+  if (noPermit) return { requiredPermits: [], maxStatePool: 0 }
+
+  const isNational = regions.includes('national_au')
+
+  // For state-based promotions divide pool by number of regions
+  // For national treat as one region
+  const regionCount = isNational ? 1 : Math.max(regions.length, 1)
+  const maxStatePool = regionCount <= 1 ? prizePoolTotal : prizePoolTotal / regionCount
+
+  const required: string[] = []
+  if ((isNational || regions.includes('ACT')) && maxStatePool > 3000)  required.push('ACT')
+  if ((isNational || regions.includes('SA'))  && maxStatePool > 5000)  required.push('SA')
+  if ((isNational || regions.includes('NSW')) && maxStatePool > 10000) required.push('NSW')
+
+  return { requiredPermits: required, maxStatePool }
+}
+
 export async function updateCampaign(id: string, data: {
   name?: string
   promoStart?: string
@@ -12,7 +40,7 @@ export async function updateCampaign(id: string, data: {
   drawFrequency?: string
   entryMechanic?: string
   regions?: string[]
-  prizes?: { tier: string; description: string; qty: number; unitValue: number }[]
+  prizes?: { tier: string; description: string; type?: string; qty: number; unitValue: number }[]
   notes?: string
   promoter?: {
     name?: string
@@ -137,6 +165,21 @@ export async function updateCampaign(id: string, data: {
     const drawMechanic = updated.mechanicType === 'SWEEPSTAKES'   ? 'Sweepstakes - Random Draw'
                        : updated.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer'
                        : 'Other'
+
+    // Recalculate permit requirements from current campaign state
+    const currentPool = prizes.reduce((s: number, p: any) => s + (p.qty * p.unitValue), 0)
+    const { requiredPermits, maxStatePool } = calcRequiredPermits(
+      updated.regions,
+      currentPool,
+      updated.mechanicType
+    )
+
+    // Write updated permits back to campaign
+    await prisma.campaign.update({
+      where: { id },
+      data: { requiredPermits, maxStatePool },
+    })
+
     const quote = calculateQuote({
       campaignId:    updated.id,
       tsCode:        updated.tsCode,

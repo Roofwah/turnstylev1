@@ -13,7 +13,7 @@ export const TRAVEL_CLAUSES = [
 Travel must be taken on the dates [[TRAVEL_BOOK_BY_DATE]] If travel is not taken on the specified dates, the prize will be forfeited and no alternative travel dates will be provided unless otherwise determined by the Promoter.
 Travel is subject to booking and availability at the time of reservation. The Promoter is not responsible for any cancellation, delay or rescheduling of flights, accommodation or events that may affect travel arrangements.
 Unless expressly stated in the prize description, the prize does not include spending money, meals, additional transport, travel insurance, passports, visas, vaccinations, transfers, taxes (excluding airline and airport taxes where applicable), or any other ancillary costs associated with redeeming the prize. Any such costs are the responsibility of the winner and any travelling companion(s).
-If the prize description includes return air travel and the winner resides within 300 kilometres of the event or destination location, airfare is not included and is not redeemable for cash.
+If the prize description includes return air travel and the winner resides within 300km of the event location, airfare will not be provided and no alternative cash or travel allowance will be offered.
 The winner and any travelling companion(s) (if applicable) must travel together on the same itinerary and depart from and return to the same departure point unless otherwise agreed by the Promoter.
 The winner and any travelling companion(s) are responsible for ensuring they have valid identification and any documentation required for travel or participation in the prize.
 The winner may be required to present a credit card at the time of accommodation check-in to cover incidental charges.

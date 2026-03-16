@@ -1,0 +1,346 @@
+# Turnstyle Preflight Engine – Rule Categories & Rule Library
+
+## Purpose
+
+This document defines the **deterministic rule library** used by the Turnstyle Preflight engine.
+
+The rules detect:
+
+- structural errors
+- logical inconsistencies
+- compliance risks
+- builder-to-terms mismatches
+- missing required clauses
+- operational weaknesses
+
+These rules run **before AI review**.
+
+---
+
+# Rule Severity Levels
+
+| Severity | Meaning |
+|--------|--------|
+| CRITICAL | Terms cannot be published |
+| ERROR | Major issue that must be corrected |
+| WARNING | Should be fixed before launch |
+| NOTICE | Optional improvement |
+
+---
+
+# Rule Categories
+
+Rules are grouped into the following categories:
+
+1. Structural Completeness
+2. Date & Timeline Integrity
+3. Eligibility Validation
+4. Entry Mechanic Validation
+5. Prize Validation
+6. Draw Mechanics
+7. Winner Notification & Publication
+8. Unclaimed Prize Handling
+9. Travel Prize Conditions
+10. Event Prize Conditions
+11. Privacy & Liability
+12. Builder vs Terms Validation
+
+---
+
+# Structural Completeness Rules
+
+### RULE-SC-01  
+Promoter clause must exist.  
+Severity: CRITICAL
+
+### RULE-SC-02  
+Promotional period clause must exist.  
+Severity: CRITICAL
+
+### RULE-SC-03  
+Eligibility section must exist.  
+Severity: CRITICAL
+
+### RULE-SC-04  
+Entry mechanic clause must exist.  
+Severity: CRITICAL
+
+### RULE-SC-05  
+Prize description clause must exist.  
+Severity: CRITICAL
+
+### RULE-SC-06  
+Total prize pool must be specified.  
+Severity: ERROR
+
+### RULE-SC-07  
+Draw clause must exist if promotion type is chance-based.  
+Severity: CRITICAL
+
+---
+
+# Date & Timeline Rules
+
+### RULE-DATE-01  
+Promotion start date must be before promotion end date.  
+Severity: CRITICAL
+
+### RULE-DATE-02  
+Draw date must occur after promotion close date.  
+Severity: CRITICAL
+
+### RULE-DATE-03  
+Unclaimed prize draw must occur after original draw date.  
+Severity: CRITICAL
+
+### RULE-DATE-04  
+Winner claim deadline must occur after notification.  
+Severity: ERROR
+
+### RULE-DATE-05  
+Travel prize dates must occur after promotion end date.  
+Severity: WARNING
+
+---
+
+# Eligibility Rules
+
+### RULE-ELIG-01  
+If entrants may be under 18, guardian consent clause must exist.  
+Severity: ERROR
+
+### RULE-ELIG-02  
+Eligibility must clearly define residency requirement.  
+Severity: WARNING
+
+### RULE-ELIG-03  
+Employees and agencies must be excluded.  
+Severity: WARNING
+
+### RULE-ELIG-04  
+Immediate family definition should exist.  
+Severity: NOTICE
+
+---
+
+# Entry Mechanic Rules
+
+### RULE-ENTRY-01  
+Entry mechanic must clearly describe how entries are earned.  
+Severity: CRITICAL
+
+### RULE-ENTRY-02  
+Purchase promotions must specify purchase threshold.  
+Severity: ERROR
+
+### RULE-ENTRY-03  
+Entry limit wording must exist (unlimited or capped).  
+Severity: NOTICE
+
+### RULE-ENTRY-04  
+Invalid entry clause should exist.  
+Severity: WARNING
+
+---
+
+# Prize Validation Rules
+
+### RULE-PRIZE-01  
+Total prize pool must equal prize quantities × prize value.  
+Severity: CRITICAL
+
+### RULE-PRIZE-02  
+Prize descriptions must clearly identify inclusions.  
+Severity: ERROR
+
+### RULE-PRIZE-03  
+Non-cash clause should exist.  
+Severity: NOTICE
+
+### RULE-PRIZE-04  
+Prize substitution clause should exist.  
+Severity: WARNING
+
+---
+
+# Draw Mechanics Rules
+
+### RULE-DRAW-01  
+Chance promotions must specify random selection process.  
+Severity: CRITICAL
+
+### RULE-DRAW-02  
+Draw date, time and location must be specified.  
+Severity: ERROR
+
+### RULE-DRAW-03  
+Number of winners must match builder configuration.  
+Severity: CRITICAL
+
+### RULE-DRAW-04  
+Reserve entries clause recommended.  
+Severity: NOTICE
+
+---
+
+# Winner Notification & Publication Rules
+
+### RULE-NOTIFY-01  
+Winner notification method must be specified.  
+Severity: CRITICAL
+
+### RULE-NOTIFY-02  
+Winner publication clause should exist where applicable.  
+Severity: WARNING
+
+### RULE-NOTIFY-03  
+Publication duration should be specified.  
+Severity: NOTICE
+
+---
+
+# Unclaimed Prize Rules
+
+### RULE-UNCLAIMED-01  
+Unclaimed prize draw clause must exist if configured.  
+Severity: CRITICAL
+
+### RULE-UNCLAIMED-02  
+Unclaimed draw must use same method as original draw.  
+Severity: ERROR
+
+### RULE-UNCLAIMED-03  
+Prize disposal wording should comply with legislation.  
+Severity: WARNING
+
+---
+
+# Travel Prize Rules
+
+### RULE-TRAVEL-01  
+Travel booking and availability clause must exist.  
+Severity: ERROR
+
+### RULE-TRAVEL-02  
+Travel insurance exclusion recommended.  
+Severity: NOTICE
+
+### RULE-TRAVEL-03  
+Companion travel clause recommended.  
+Severity: WARNING
+
+### RULE-TRAVEL-04  
+Airfare exclusion clause required if geographic limits apply.  
+Severity: WARNING
+
+---
+
+# Event Prize Rules
+
+### RULE-EVENT-01  
+Event cancellation or postponement clause recommended.  
+Severity: WARNING
+
+### RULE-EVENT-02  
+Event organiser terms clause recommended.  
+Severity: NOTICE
+
+---
+
+# Privacy & Liability Rules
+
+### RULE-PRIV-01  
+Privacy clause must exist.  
+Severity: CRITICAL
+
+### RULE-PRIV-02  
+Privacy policy URL must be present.  
+Severity: ERROR
+
+### RULE-PRIV-03  
+Liability limitation clause recommended.  
+Severity: NOTICE
+
+---
+
+# Builder vs Terms Validation Rules
+
+These compare structured campaign data with generated terms.
+
+### RULE-BUILDER-01  
+Number of winners must match builder value.  
+Severity: CRITICAL
+
+### RULE-BUILDER-02  
+Prize values must match builder configuration.  
+Severity: CRITICAL
+
+### RULE-BUILDER-03  
+Promotion dates must match builder inputs.  
+Severity: CRITICAL
+
+### RULE-BUILDER-04  
+Total prize pool must match calculated value.  
+Severity: CRITICAL
+
+### RULE-BUILDER-05  
+Promotion type must match clause structure.  
+Severity: CRITICAL
+
+---
+
+# Scoring Model
+
+| Severity | Penalty |
+|--------|--------|
+| CRITICAL | -20 |
+| ERROR | -10 |
+| WARNING | -5 |
+| NOTICE | -2 |
+
+Maximum Score = 100  
+Minimum Score = 0
+
+---
+
+# Risk Bands
+
+| Score | Risk Level |
+|------|------------|
+| 95-100 | Excellent |
+| 85-94 | Low Risk |
+| 70-84 | Moderate Risk |
+| 50-69 | High Risk |
+| 0-49 | Not Ready |
+
+---
+
+# Recommended First 10 Rules
+
+1. Promotion start before end
+2. Draw date after close
+3. Prize pool math validation
+4. Winner count validation
+5. Builder vs terms mismatch detection
+6. Missing promoter clause
+7. Missing eligibility clause
+8. Missing entry mechanic
+9. Missing draw method
+10. Missing prize description
+
+---
+
+# Long-Term Expansion
+
+The rule library should eventually include **80–120 rules** covering:
+
+- state-specific permit requirements
+- travel prize complexity
+- instant win mechanics
+- trade promotion eligibility
+- loyalty membership promotions
+- marketing consent clauses
+- winner publication requirements
+- operational risk wording
+
+The **rule library becomes core intellectual property for Turnstyle**.

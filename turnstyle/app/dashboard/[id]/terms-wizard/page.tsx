@@ -6,6 +6,9 @@ import { getCampaign } from '@/app/actions/getCampaign'
 import Link from 'next/link'
 import { getTemplatesForCampaign, getAllTemplates, mergeSubTemplatesIntoClauses, type TemplateEntry } from '@/lib/terms-templates'
 import { useNotify } from '@/components/useNotify'
+import { preflightCampaign } from '@/app/actions/preflightCampaign'
+import { buildPermitClause } from '@/lib/preflight/permitClause'
+import type { PreflightReport, PreflightIssue, IssueSeverity } from '@/lib/preflight/types'
 
 // Template registry
 type TemplateData = {
@@ -33,6 +36,8 @@ interface Gap {
   placeholder?: string
   multiline?: boolean
   multiple?: boolean
+  default?: string
+  hidden?: boolean
   followUp?: GapFollowUp
 }
 
@@ -87,7 +92,10 @@ function calcUnclaimed(promoEnd: string) {
 }
 
 function normaliseCampaign(raw: any) {
-  const prizes: PrizeTier[] = Array.isArray(raw.prizes) ? raw.prizes : []
+  // Use confirmedPrizes when available — same source as quote and prize tab
+  const prizes: PrizeTier[] = Array.isArray(raw.confirmedPrizes) && raw.confirmedPrizes.length > 0
+    ? raw.confirmedPrizes
+    : Array.isArray(raw.prizes) ? raw.prizes : []
   const prizePool = prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
   const totalWinners = prizes.reduce((s, p) => s + p.qty, 0)
   return {
@@ -104,6 +112,10 @@ function normaliseCampaign(raw: any) {
     prizePool,
     totalWinners,
     prizeList:     prizes.map(p => `${p.qty} x ${p.description} valued at ${formatMoney(p.unitValue)} (incl. GST)`).join('\n'),
+    requiredPermits: raw.requiredPermits ?? [],
+    permitNSW:     raw.permitNSW ?? null,
+    permitSA:      raw.permitSA  ?? null,
+    permitACT:     raw.permitACT ?? null,
   }
 }
 
@@ -131,6 +143,164 @@ function AnimatedText({ text }: { text: string }) {
   )
 }
 
+// ─── Preflight UI ─────────────────────────────
+
+const SEVERITY_CONFIG: Record<IssueSeverity, { label: string; bg: string; text: string; dot: string }> = {
+  CRITICAL: { label: 'Critical', bg: 'bg-red-500/10',    text: 'text-red-400',    dot: 'bg-red-400' },
+  ERROR:    { label: 'Error',    bg: 'bg-orange-500/10', text: 'text-orange-400', dot: 'bg-orange-400' },
+  WARNING:  { label: 'Warning',  bg: 'bg-amber-500/10',  text: 'text-amber-400',  dot: 'bg-amber-400' },
+  NOTICE:   { label: 'Notice',   bg: 'bg-blue-500/10',   text: 'text-blue-400',   dot: 'bg-blue-400' },
+}
+
+const RISK_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  EXCELLENT:     { label: 'Excellent',     color: 'text-emerald-400', bg: 'bg-emerald-400' },
+  LOW_RISK:      { label: 'Low Risk',      color: 'text-green-400',   bg: 'bg-green-400' },
+  MODERATE_RISK: { label: 'Moderate Risk', color: 'text-amber-400',   bg: 'bg-amber-400' },
+  HIGH_RISK:     { label: 'High Risk',     color: 'text-orange-400',  bg: 'bg-orange-400' },
+  NOT_READY:     { label: 'Not Ready',     color: 'text-red-400',     bg: 'bg-red-400' },
+}
+
+function IssueCard({ issue }: { issue: PreflightIssue }) {
+  const [open, setOpen] = useState(false)
+  const cfg = SEVERITY_CONFIG[issue.severity]
+  return (
+    <div className={`rounded-lg border border-white/10 overflow-hidden ${cfg.bg}`}>
+      <button onClick={() => setOpen(o => !o)} className="w-full px-4 py-3 flex items-start gap-3 text-left">
+        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={`text-xs font-bold uppercase tracking-wider ${cfg.text}`}>{cfg.label}</span>
+            <span className="text-white/20 text-xs">{issue.ruleId}</span>
+          </div>
+          <p className="text-white/90 text-sm font-medium leading-snug">{issue.title}</p>
+        </div>
+        <span className="text-white/30 text-xs mt-1 shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
+          <p className="text-white/60 text-sm leading-relaxed">{issue.description}</p>
+          {issue.suggestedFix && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Suggested fix</p>
+              <p className="text-white/70 text-sm leading-relaxed">{issue.suggestedFix}</p>
+            </div>
+          )}
+          {issue.suggestedRewrite && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Suggested rewrite</p>
+              <p className="text-white/70 text-sm leading-relaxed italic border-l-2 border-white/20 pl-3">{issue.suggestedRewrite}</p>
+            </div>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            {issue.affectedClause && <span className="text-white/30 text-xs bg-white/5 rounded px-2 py-0.5">Clause: {issue.affectedClause}</span>}
+            {issue.sourceLayer && <span className="text-white/30 text-xs bg-white/5 rounded px-2 py-0.5">{issue.sourceLayer === 'ai' ? 'AI review' : 'Rules engine'}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PreflightPanel({ report, campaignName, onClose }: { report: PreflightReport; campaignName: string; onClose: () => void }) {
+  const risk = RISK_CONFIG[report.score.riskBand] ?? RISK_CONFIG.NOT_READY
+  const { criticalCount, errorCount, warningCount, noticeCount, isPublishReady } = report.summary
+  const grouped = useMemo(() => {
+    const order: IssueSeverity[] = ['CRITICAL', 'ERROR', 'WARNING', 'NOTICE']
+    return order.map(sev => ({ severity: sev, issues: report.issues.filter(i => i.severity === sev) })).filter(g => g.issues.length > 0)
+  }, [report])
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-[#0f0f18] border-l border-white/10 flex flex-col h-full shadow-2xl" style={{ animation: 'slideIn 0.25s ease-out' }}>
+        <style>{`@keyframes slideIn { from { transform: translateX(100%) } to { transform: translateX(0) } }`}</style>
+        <div className="px-5 py-4 border-b border-white/10 shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/ai.svg" alt="Preflight" className="w-6 h-6 opacity-70" />
+            <div>
+              <p className="text-white font-bold text-sm">Preflight Report</p>
+              <p className="text-white/40 text-xs">{new Date(report.generatedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5">✕</button>
+        </div>
+        <div className="px-5 py-5 border-b border-white/10 shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Overall score</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-white font-black text-4xl">{report.score.total}</span>
+                <span className="text-white/30 text-lg">/100</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-sm font-bold ${risk.color}`}>{risk.label}</span>
+              <p className="text-white/40 text-xs mt-1 max-w-[160px] leading-snug">{report.score.readinessStatus}</p>
+            </div>
+          </div>
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden mb-4">
+            <div className={`h-full rounded-full ${risk.bg}`} style={{ width: `${report.score.total}%` }} />
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'Critical', count: criticalCount, color: 'text-red-400' },
+              { label: 'Errors',   count: errorCount,    color: 'text-orange-400' },
+              { label: 'Warnings', count: warningCount,  color: 'text-amber-400' },
+              { label: 'Notices',  count: noticeCount,   color: 'text-blue-400' },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="bg-white/5 rounded-lg px-2 py-2 text-center">
+                <p className={`text-lg font-black ${color}`}>{count}</p>
+                <p className="text-white/30 text-xs">{label}</p>
+              </div>
+            ))}
+          </div>
+          <div className={`mt-3 rounded-lg px-3 py-2 flex items-center gap-2 ${isPublishReady ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+            <span className={`text-sm ${isPublishReady ? 'text-emerald-400' : 'text-red-400'}`}>{isPublishReady ? '✓' : '✕'}</span>
+            <span className={`text-sm font-medium ${isPublishReady ? 'text-emerald-400' : 'text-red-400'}`}>
+              {isPublishReady ? 'Ready to publish' : 'Not ready to publish'}
+            </span>
+            {report.aiReviewUsed && <span className="ml-auto text-white/20 text-xs">AI + Rules</span>}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {grouped.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-emerald-400 text-lg font-bold mb-1">No issues found</p>
+              <p className="text-white/40 text-sm">Terms passed all checks.</p>
+            </div>
+          ) : grouped.map(({ severity, issues }) => {
+            const cfg = SEVERITY_CONFIG[severity]
+            return (
+              <div key={severity}>
+                <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${cfg.text}`}>{cfg.label} · {issues.length}</p>
+                <div className="space-y-2">{issues.map(issue => <IssueCard key={issue.ruleId} issue={issue} />)}</div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="px-5 py-3 border-t border-white/10 shrink-0 flex items-center justify-between">
+          <p className="text-white/20 text-xs">Turnstyle Preflight · {report.reportId.slice(0, 8)}</p>
+          <button
+            onClick={() => {
+              sessionStorage.setItem(
+                `preflight-report-${report.campaignId}`,
+                JSON.stringify({ report, campaignName })
+              )
+              window.open(`/dashboard/${report.campaignId}/preflight-report`, '_blank')
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold text-white/50 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-lg transition-all"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TermsWizardPage() {
   const params = useParams()
   const id = params.id as string
@@ -149,6 +319,11 @@ export default function TermsWizardPage() {
   const [showDocument, setShowDocument] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
   const [draftVersion, setDraftVersion] = useState<number | null>(null)
+
+  // Preflight state
+  const [preflightLoading, setPreflightLoading] = useState(false)
+  const [preflightReport, setPreflightReport]   = useState<PreflightReport | null>(null)
+  const [showPreflight, setShowPreflight]       = useState(false)
 
   function answer(key: string, value: string | number) {
     setAnswers(prev => ({ ...prev, [key]: value }))
@@ -211,22 +386,39 @@ export default function TermsWizardPage() {
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []
   }, [answers])
   const currentClauses = mergeSubTemplatesIntoClauses(baseClauses, selectedSubTemplateIds, { insertAfterSlug: 'prizes' })
-  const clausesForDocument = useMemo(() => currentClauses.filter((c: Clause) => c.slug !== 'sub_template_choice'), [currentClauses])
+  const clausesForDocument = useMemo(() => {
+    const base = currentClauses.filter((c: Clause) => c.slug !== 'sub_template_choice')
+    if (!campaign) return base
+    const permitClause = buildPermitClause(campaign)
+    if (!permitClause) return base
+    const withoutHardcoded = base.filter((c: Clause) => c.slug !== 'permits')
+    const [heading, ...bodyLines] = permitClause.split('\n\n')
+    return [...withoutHardcoded, { slug: 'permits-dynamic', label: heading, text: bodyLines.join('\n\n') } as Clause]
+  }, [currentClauses, campaign])
 
   const allQuestions: Question[] = useMemo(() => {
     const questions: Question[] = []
+    const defaultsToApply: Record<string, string> = {}
     currentClauses.forEach((clause: Clause) => {
       if (!clause.gaps) return
       clause.gaps.forEach((gap: Gap) => {
-        questions.push({ gap, isFollowUp: false })
-        if (gap.followUp) {
-          const parentAnswer = answers[gap.key]
-          if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
-            questions.push({ gap: gap.followUp, isFollowUp: true, parentGap: gap })
+        if (gap.default && answers[gap.key] === undefined) {
+          defaultsToApply[gap.key] = gap.default
+        }
+        if (!gap.hidden) {
+          questions.push({ gap, isFollowUp: false })
+          if (gap.followUp) {
+            const parentAnswer = answers[gap.key]
+            if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
+              questions.push({ gap: gap.followUp, isFollowUp: true, parentGap: gap })
+            }
           }
         }
       })
     })
+    if (Object.keys(defaultsToApply).length > 0) {
+      setAnswers(prev => ({ ...defaultsToApply, ...prev }))
+    }
     return questions
   }, [answers, currentClauses])
 
@@ -356,10 +548,14 @@ export default function TermsWizardPage() {
   async function saveAndShare() {
     if (!campaign) return
     setSharing(true)
-    const content = clausesForDocument.map((clause: Clause) => {
-      const { resolved } = resolveText(clause.text)
-      return `${clause.label}\n\n${resolved}`
-    }).join('\n\n---\n\n')
+    const content = clausesForDocument
+      .map((clause: Clause) => {
+        const { resolved } = resolveText(clause.text)
+        return { label: clause.label, resolved }
+      })
+      .filter(({ resolved }) => resolved && resolved.trim().length > 0)
+      .map(({ label, resolved }) => `${label}\n\n${resolved}`)
+      .join('\n\n---\n\n')
 
     try {
       const res = await fetch('/api/terms', {
@@ -404,6 +600,30 @@ export default function TermsWizardPage() {
     }
   }
 
+  async function runPreflight() {
+    if (!campaign?.id) return
+    setPreflightLoading(true)
+    try {
+      const renderedTerms = clausesForDocument
+        .map((clause: Clause) => {
+          const { resolved } = resolveText(clause.text)
+          return `${clause.label}\n\n${resolved}`
+        })
+        .join('\n\n---\n\n')
+      const result = await preflightCampaign(campaign.id, renderedTerms, answers)
+      if ('error' in result) {
+        console.error('[preflight]', result.error)
+        return
+      }
+      setPreflightReport(result.report)
+      setShowPreflight(true)
+    } catch (e) {
+      console.error('[preflight]', e)
+    } finally {
+      setPreflightLoading(false)
+    }
+  }
+
   function handleEditAnswers() {
     setShowModal(true)
     setCurrentQuestionIndex(0)
@@ -417,7 +637,7 @@ export default function TermsWizardPage() {
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
 
       {/* Nav */}
-      <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
+      <nav className="no-print border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <img src="/tstyle.png" alt="Turnstyle" className="h-7 w-auto" />
@@ -436,10 +656,17 @@ export default function TermsWizardPage() {
           <div className="flex items-center gap-2">
             {showDocument && !isReadonly && (
               <button
-                className="flex items-center justify-center bg-amber-500/20 border border-amber-500/40 text-amber-400 p-2 rounded-lg hover:bg-amber-500/30 transition-all"
-                title="AI Assistant"
+                onClick={runPreflight}
+                disabled={preflightLoading}
+                className="flex items-center gap-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-400 px-3 py-1.5 rounded-lg hover:bg-amber-500/30 transition-all disabled:opacity-50"
+                title="Run Preflight"
               >
-                <img src="/ai.svg" alt="AI" className="w-4 h-4" />
+                {preflightLoading ? (
+                  <span className="w-4 h-4 border border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                ) : (
+                  <img src="/ai.svg" alt="AI" className="w-4 h-4" />
+                )}
+                <span className="text-xs font-semibold">{preflightLoading ? 'Running...' : 'Preflight'}</span>
               </button>
             )}
             {showDocument && shareLink && !isReadonly && (
@@ -642,30 +869,50 @@ export default function TermsWizardPage() {
       {/* Document */}
       {showDocument && campaign && (
         <main className="max-w-4xl mx-auto px-6 py-10">
-          <div className="mb-6">
+          <style>{`
+            @media print {
+              .no-print { display: none !important; }
+              .terms-card { box-shadow: none !important; border-radius: 0 !important; }
+              .terms-header { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+              body { background: white !important; }
+              .terms-outer { padding: 0 !important; }
+            }
+          `}</style>
+
+          <div className="mb-4 no-print">
             <p className="text-white/30 text-xs font-semibold uppercase tracking-widest mb-1">{templateMeta.name}</p>
             <h1 className="text-white font-black text-3xl mb-1">{campaign.name}</h1>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-xl">
-            <div className="px-8 py-6 border-b border-gray-100">
-              <h2 className="text-gray-900 font-black text-xl">{campaign.name}</h2>
-              <p className="text-gray-400 text-sm mt-0.5">Terms & Conditions · {templateMeta.name}</p>
+          <div className="terms-card bg-white rounded-xl overflow-hidden shadow-lg border border-gray-100 terms-outer">
+
+            {/* Header with dark background + logo */}
+            <div className="terms-header" style={{ background: '#0a0a0f', padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <img src="/tstyle.png" alt="Turnstyle" style={{ height: 24, marginBottom: 10 }} />
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 2 }}>Terms & Conditions</div>
+                <div style={{ color: '#fff', fontSize: 16, fontWeight: 900 }}>{campaign.name}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, marginBottom: 2 }}>{templateMeta.name}</div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontFamily: 'monospace' }}>{campaign.tsCode}</div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-[220px_1fr] bg-gray-50 border-b border-gray-200">
-              <div className="px-8 py-3 text-xs font-bold uppercase tracking-widest text-gray-400">Item</div>
-              <div className="px-6 py-3 text-xs font-bold uppercase tracking-widest text-gray-400 border-l border-gray-100">Details</div>
+            {/* Table header */}
+            <div className="grid border-b border-gray-200 bg-gray-50" style={{ gridTemplateColumns: '160px 1fr' }}>
+              <div className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-400">Clause</div>
+              <div className="px-6 py-2.5 text-xs font-bold uppercase tracking-widest text-gray-400 border-l border-gray-100">Details</div>
             </div>
 
             {clausesForDocument.length > 0 ? (
               clausesForDocument.map((clause, ci) => {
                 const { resolved, hasUnfilledGaps } = resolveText(clause.text)
                 return (
-                  <div key={clause.slug} className={`grid grid-cols-[220px_1fr] border-b border-gray-100 last:border-0 ${ci % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
-                    <div className="px-8 py-4 flex items-start gap-2">
-                      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${clause.gaps ? 'bg-amber-400' : 'bg-gray-300'}`} />
-                      <span className="text-gray-800 font-semibold text-sm leading-snug">{clause.label}</span>
+                  <div key={clause.slug} className="border-b border-gray-100 last:border-0" style={{ display: 'grid', gridTemplateColumns: '160px 1fr', background: ci % 2 === 1 ? '#fafafa' : '#fff' }}>
+                    <div className="px-6 py-4 flex items-start gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${clause.gaps ? 'bg-amber-400' : 'bg-gray-200'}`} />
+                      <span className="text-gray-700 font-semibold text-xs leading-snug">{clause.label}</span>
                     </div>
                     <div className="px-6 py-4 border-l border-gray-100">
                       <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
@@ -687,14 +934,14 @@ export default function TermsWizardPage() {
               </div>
             )}
 
-            <div className="px-8 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+            <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
               <p className="text-gray-300 text-xs">Generated by Turnstyle · Flow Marketing · 11 Lomandra Pl, Coolum Beach QLD 4573</p>
               <p className="text-gray-300 text-xs font-mono">{campaign.tsCode}</p>
             </div>
           </div>
 
           {!isReadonly && (
-          <div className="mt-6 flex justify-center pb-16">
+          <div className="mt-6 flex justify-center pb-16 no-print">
             <button
               onClick={handleEditAnswers}
               className="px-6 py-3 rounded-xl font-semibold bg-white/10 text-white hover:bg-white/20 transition-all border border-white/10">
@@ -703,6 +950,14 @@ export default function TermsWizardPage() {
           </div>
           )}
         </main>
+      )}
+
+      {showPreflight && preflightReport && (
+        <PreflightPanel
+          report={preflightReport}
+          campaignName={campaign?.name ?? ''}
+          onClose={() => setShowPreflight(false)}
+        />
       )}
     </div>
   )

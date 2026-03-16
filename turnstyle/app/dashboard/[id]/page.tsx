@@ -819,7 +819,7 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
               <h2 className="text-white font-bold text-xs uppercase tracking-widest mb-4 opacity-60">Prize Structure</h2>
               {editing ? (
                 <div className="space-y-3">
-                  {draft.prizes.map((prize, i) => (
+                  {(draft.confirmedPrizes?.length > 0 ? draft.confirmedPrizes : draft.prizes).map((prize, i) => (
                     <div key={i} className="grid grid-cols-12 gap-2 items-center">
                       <div className="col-span-1">
                         <input value={prize.tier} onChange={e => updatePrize(i, 'tier', e.target.value)} placeholder="1st"
@@ -848,9 +848,9 @@ if (['DRAFT','CONFIRMED','COMPILED','REVIEW','PENDING','SCHEDULED'].includes(cam
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {campaign.prizes.length === 0 ? (
+                  {activePrizes.length === 0 ? (
                     <p className="text-white/30 text-sm">No prizes added yet</p>
-                  ) : campaign.prizes.map((prize, i) => (
+                  ) : activePrizes.map((prize, i) => (
                     <div key={i} className="flex items-center justify-between py-2 border-b border-white/[0.04] last:border-0">
                       <div className="flex items-center gap-4">
                         <span className="text-white/30 text-xs font-mono w-8">{prize.tier}</span>

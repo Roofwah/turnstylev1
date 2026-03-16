@@ -4,6 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { getCampaignByTsCode } from '@/app/actions/getCampaign'
 import { getTemplatesForCampaign, getAllTemplates, mergeSubTemplatesIntoClauses, type TemplateEntry } from '@/lib/terms-templates'
+import { preflightCampaign } from '@/app/actions/preflightCampaign'
+import { buildPermitClause } from '@/lib/preflight/permitClause'
+import type { PreflightReport, PreflightIssue, IssueSeverity } from '@/lib/preflight/types'
 
 interface PrizeTier { tier: string; description: string; qty: number; unitValue: number }
 
@@ -23,6 +26,8 @@ interface Gap {
   placeholder?: string
   multiline?: boolean
   multiple?: boolean
+  default?: string
+  hidden?: boolean
   followUp?: GapFollowUp
 }
 
@@ -99,6 +104,11 @@ function normaliseCampaign(raw: any) {
     prizePool,
     totalWinners,
     prizeList: prizes.map((p: PrizeTier) => `${p.qty} x ${p.description} valued at ${formatMoney(p.unitValue)} (incl. GST)`).join('\n'),
+    // Permit fields
+    requiredPermits: raw.requiredPermits ?? [],
+    permitNSW: raw.permitNSW ?? null,
+    permitSA:  raw.permitSA  ?? null,
+    permitACT: raw.permitACT ?? null,
   }
 }
 
@@ -116,6 +126,209 @@ function formatAddress(address: any): string {
   return '[Address]'
 }
 
+// ─── Preflight UI helpers ─────────────────────
+
+const SEVERITY_CONFIG: Record<IssueSeverity, { label: string; bg: string; text: string; dot: string }> = {
+  CRITICAL: { label: 'Critical', bg: 'bg-red-500/10',    text: 'text-red-400',    dot: 'bg-red-400' },
+  ERROR:    { label: 'Error',    bg: 'bg-orange-500/10', text: 'text-orange-400', dot: 'bg-orange-400' },
+  WARNING:  { label: 'Warning',  bg: 'bg-amber-500/10',  text: 'text-amber-400',  dot: 'bg-amber-400' },
+  NOTICE:   { label: 'Notice',   bg: 'bg-blue-500/10',   text: 'text-blue-400',   dot: 'bg-blue-400' },
+}
+
+const RISK_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  EXCELLENT:     { label: 'Excellent',     color: 'text-emerald-400', bg: 'bg-emerald-400' },
+  LOW_RISK:      { label: 'Low Risk',      color: 'text-green-400',   bg: 'bg-green-400' },
+  MODERATE_RISK: { label: 'Moderate Risk', color: 'text-amber-400',   bg: 'bg-amber-400' },
+  HIGH_RISK:     { label: 'High Risk',     color: 'text-orange-400',  bg: 'bg-orange-400' },
+  NOT_READY:     { label: 'Not Ready',     color: 'text-red-400',     bg: 'bg-red-400' },
+}
+
+function IssueCard({ issue }: { issue: PreflightIssue }) {
+  const [open, setOpen] = useState(false)
+  const cfg = SEVERITY_CONFIG[issue.severity]
+  return (
+    <div className={`rounded-lg border border-white/10 overflow-hidden ${cfg.bg}`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-4 py-3 flex items-start gap-3 text-left"
+      >
+        <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className={`text-xs font-bold uppercase tracking-wider ${cfg.text}`}>{cfg.label}</span>
+            <span className="text-white/20 text-xs">{issue.ruleId}</span>
+          </div>
+          <p className="text-white/90 text-sm font-medium leading-snug">{issue.title}</p>
+        </div>
+        <span className="text-white/30 text-xs mt-1 shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-3 border-t border-white/10 pt-3">
+          <p className="text-white/60 text-sm leading-relaxed">{issue.description}</p>
+          {issue.suggestedFix && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Suggested fix</p>
+              <p className="text-white/70 text-sm leading-relaxed">{issue.suggestedFix}</p>
+            </div>
+          )}
+          {issue.suggestedRewrite && (
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Suggested rewrite</p>
+              <p className="text-white/70 text-sm leading-relaxed italic border-l-2 border-white/20 pl-3">{issue.suggestedRewrite}</p>
+            </div>
+          )}
+          <div className="flex gap-2 flex-wrap">
+            {issue.affectedClause && (
+              <span className="text-white/30 text-xs bg-white/5 rounded px-2 py-0.5">Clause: {issue.affectedClause}</span>
+            )}
+            {issue.sourceLayer && (
+              <span className="text-white/30 text-xs bg-white/5 rounded px-2 py-0.5">{issue.sourceLayer === 'ai' ? 'AI review' : 'Rules engine'}</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PreflightPanel({ report, onClose }: { report: PreflightReport; onClose: () => void }) {
+  const risk = RISK_CONFIG[report.score.riskBand] ?? RISK_CONFIG.NOT_READY
+  const { criticalCount, errorCount, warningCount, noticeCount, isPublishReady } = report.summary
+
+  const grouped = useMemo(() => {
+    const order: IssueSeverity[] = ['CRITICAL', 'ERROR', 'WARNING', 'NOTICE']
+    return order
+      .map(sev => ({
+        severity: sev,
+        issues: report.issues.filter(i => i.severity === sev),
+      }))
+      .filter(g => g.issues.length > 0)
+  }, [report])
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Panel */}
+      <div className="relative w-full max-w-lg bg-[#0f0f18] border-l border-white/10 flex flex-col h-full shadow-2xl animate-slide-in">
+
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-white/10 shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1L10 6H15L11 9.5L12.5 15L8 11.5L3.5 15L5 9.5L1 6H6L8 1Z" fill="currentColor" className="text-white/60"/>
+              </svg>
+            </div>
+            <div>
+              <p className="text-white font-bold text-sm">Preflight Report</p>
+              <p className="text-white/40 text-xs">{new Date(report.generatedAt).toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-white/40 hover:text-white transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Score block */}
+        <div className="px-5 py-5 border-b border-white/10 shrink-0">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-white/40 text-xs font-semibold uppercase tracking-wider mb-1">Overall score</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-white font-black text-4xl">{report.score.total}</span>
+                <span className="text-white/30 text-lg">/100</span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-sm font-bold ${risk.color}`}>{risk.label}</span>
+              <p className="text-white/40 text-xs mt-1 max-w-[160px] leading-snug">{report.score.readinessStatus}</p>
+            </div>
+          </div>
+
+          {/* Score bar */}
+          <div className="h-2 bg-white/5 rounded-full overflow-hidden mb-4">
+            <div
+              className={`h-full rounded-full transition-all ${risk.bg}`}
+              style={{ width: `${report.score.total}%` }}
+            />
+          </div>
+
+          {/* Issue counts */}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'Critical', count: criticalCount, color: 'text-red-400' },
+              { label: 'Errors',   count: errorCount,    color: 'text-orange-400' },
+              { label: 'Warnings', count: warningCount,  color: 'text-amber-400' },
+              { label: 'Notices',  count: noticeCount,   color: 'text-blue-400' },
+            ].map(({ label, count, color }) => (
+              <div key={label} className="bg-white/5 rounded-lg px-2 py-2 text-center">
+                <p className={`text-lg font-black ${color}`}>{count}</p>
+                <p className="text-white/30 text-xs">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Publish readiness */}
+          <div className={`mt-3 rounded-lg px-3 py-2 flex items-center gap-2 ${isPublishReady ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+            <span className={`text-sm ${isPublishReady ? 'text-emerald-400' : 'text-red-400'}`}>
+              {isPublishReady ? '✓' : '✕'}
+            </span>
+            <span className={`text-sm font-medium ${isPublishReady ? 'text-emerald-400' : 'text-red-400'}`}>
+              {isPublishReady ? 'Ready to publish' : 'Not ready to publish'}
+            </span>
+            {report.aiReviewUsed && (
+              <span className="ml-auto text-white/20 text-xs">AI + Rules</span>
+            )}
+          </div>
+        </div>
+
+        {/* Issues list */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {grouped.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-emerald-400 text-lg font-bold mb-1">No issues found</p>
+              <p className="text-white/40 text-sm">Terms passed all checks.</p>
+            </div>
+          ) : (
+            grouped.map(({ severity, issues }) => {
+              const cfg = SEVERITY_CONFIG[severity]
+              return (
+                <div key={severity}>
+                  <p className={`text-xs font-bold uppercase tracking-wider mb-2 ${cfg.text}`}>
+                    {cfg.label} · {issues.length}
+                  </p>
+                  <div className="space-y-2">
+                    {issues.map(issue => (
+                      <IssueCard key={issue.ruleId} issue={issue} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-white/10 shrink-0">
+          <p className="text-white/20 text-xs text-center">
+            Turnstyle Preflight · {report.reportId.slice(0, 8)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────
+
 export default function TermsTestPage() {
   const [campaignCode, setCampaignCode] = useState('')
   const [campaign, setCampaign] = useState<any>(null)
@@ -124,6 +337,12 @@ export default function TermsTestPage() {
   const [availableTemplates, setAvailableTemplates] = useState<TemplateEntry[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<string>('repco-trade')
   const [answers, setAnswers] = useState<Record<string, string | number | string[]>>({})
+
+  // Preflight state
+  const [preflightLoading, setPreflightLoading] = useState(false)
+  const [preflightReport, setPreflightReport] = useState<PreflightReport | null>(null)
+  const [preflightError, setPreflightError] = useState<string | null>(null)
+  const [showPreflight, setShowPreflight] = useState(false)
 
   function answer(key: string, value: string | number) {
     setAnswers(prev => ({ ...prev, [key]: value }))
@@ -175,6 +394,41 @@ export default function TermsTestPage() {
     }
   }
 
+  async function runPreflight() {
+    if (!campaign?.id) return
+    setPreflightLoading(true)
+    setPreflightError(null)
+    try {
+      // Build the full rendered terms string from live clause content
+      // This is exactly what the user sees in the preview — no save step needed
+      const renderedTerms = clausesForDocument
+        .map((clause: Clause) => {
+          const { resolved } = resolveText(clause.text)
+          return `${clause.label}\n\n${resolved}`
+        })
+        .join('\n\n---\n\n')
+
+      // Append permit clause automatically if required
+      const permitClause = buildPermitClause(campaign)
+      const fullTerms = permitClause
+        ? `${renderedTerms}\n\n---\n\n${permitClause}`
+        : renderedTerms
+
+      const result = await preflightCampaign(campaign.id, fullTerms, answers)
+      if ('error' in result) {
+        setPreflightError(result.error)
+        return
+      }
+      setPreflightReport(result.report)
+      setShowPreflight(true)
+    } catch (e) {
+      setPreflightError('Preflight failed. Check console for details.')
+      console.error('[preflight]', e)
+    } finally {
+      setPreflightLoading(false)
+    }
+  }
+
   const currentTemplate =
     availableTemplates.find(t => t.meta.id === selectedTemplate) ??
     availableTemplates[0] ??
@@ -186,22 +440,55 @@ export default function TermsTestPage() {
     return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '') : []
   }, [answers])
   const currentClauses = mergeSubTemplatesIntoClauses(baseClauses, selectedSubTemplateIds, { insertAfterSlug: 'prizes' })
-  const clausesForDocument = useMemo(() => currentClauses.filter((c: Clause) => c.slug !== 'sub_template_choice'), [currentClauses])
+  const clausesForDocument = useMemo(() => {
+    const base = currentClauses.filter((c: Clause) => c.slug !== 'sub_template_choice')
+    if (!campaign) return base
+    // Append permit clause dynamically if permits are required
+    const permitClause = buildPermitClause(campaign)
+    if (!permitClause) return base
+    // Remove any hardcoded permit clause from the template
+    const withoutHardcoded = base.filter((c: Clause) => c.slug !== 'permits')
+    // Parse the clause string into a Clause object for rendering
+    const [heading, ...bodyLines] = permitClause.split('\n\n')
+    return [
+      ...withoutHardcoded,
+      {
+        slug: 'permits-dynamic',
+        label: heading,
+        text: bodyLines.join('\n\n'),
+      } as Clause,
+    ]
+  }, [currentClauses, campaign])
 
   const allQuestions: Question[] = useMemo(() => {
     const questions: Question[] = []
+    const defaultsToApply: Record<string, string> = {}
+
     currentClauses.forEach((clause: Clause) => {
       if (!clause.gaps) return
       clause.gaps.forEach((gap: Gap) => {
-        questions.push({ gap, isFollowUp: false })
-        if (gap.followUp) {
-          const parentAnswer = answers[gap.key]
-          if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
-            questions.push({ gap: gap.followUp, isFollowUp: true, parentGap: gap })
+        // Collect defaults for gaps that have them and aren't already answered
+        if (gap.default && answers[gap.key] === undefined) {
+          defaultsToApply[gap.key] = gap.default
+        }
+        // Only add to visible questions if not hidden
+        if (!gap.hidden) {
+          questions.push({ gap, isFollowUp: false })
+          if (gap.followUp) {
+            const parentAnswer = answers[gap.key]
+            if (parentAnswer !== undefined && Number(parentAnswer) === gap.followUp.showWhen) {
+              questions.push({ gap: gap.followUp, isFollowUp: true, parentGap: gap })
+            }
           }
         }
       })
     })
+
+    // Apply defaults without triggering re-render loop
+    if (Object.keys(defaultsToApply).length > 0) {
+      setAnswers(prev => ({ ...defaultsToApply, ...prev }))
+    }
+
     return questions
   }, [answers, currentClauses])
 
@@ -302,8 +589,17 @@ export default function TermsTestPage() {
   // Split screen: wizard left, live terms right
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col">
+      <style>{`
+        @keyframes slide-in {
+          from { transform: translateX(100%); }
+          to   { transform: translateX(0); }
+        }
+        .animate-slide-in { animation: slide-in 0.25s ease-out forwards; }
+      `}</style>
+
       <div className="fixed inset-0 opacity-[0.02] pointer-events-none"
         style={{ backgroundImage: `linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)`, backgroundSize: '64px 64px' }} />
+
       <nav className="border-b border-white/[0.06] sticky top-0 bg-[#0a0a0f]/90 backdrop-blur-sm z-10 shrink-0">
         <div className="max-w-full mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -462,14 +758,54 @@ export default function TermsTestPage() {
                     <div className="px-6 py-8 text-center text-gray-400 text-sm">No clauses in template.</div>
                   )}
                 </div>
+
+                {/* Footer with preflight button */}
                 <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                   <p className="text-gray-300 text-xs">Turnstyle · {campaign.tsCode}</p>
+                  <div className="flex items-center gap-2">
+                    {preflightError && (
+                      <p className="text-red-400 text-xs">{preflightError}</p>
+                    )}
+                    {preflightReport && !showPreflight && (
+                      <button
+                        onClick={() => setShowPreflight(true)}
+                        className="text-xs text-white/50 hover:text-white px-2 py-1 rounded border border-white/10 hover:border-white/20 transition-all"
+                      >
+                        View report
+                      </button>
+                    )}
+                    <button
+                      onClick={runPreflight}
+                      disabled={preflightLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0a0a0f] text-white text-xs font-semibold hover:bg-black transition-all disabled:opacity-50"
+                    >
+                      {preflightLoading ? (
+                        <>
+                          <span className="w-3 h-3 border border-white/30 border-t-white/80 rounded-full animate-spin" />
+                          Running...
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          Run Preflight
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Preflight slide-in panel */}
+      {showPreflight && preflightReport && (
+        <PreflightPanel
+          report={preflightReport}
+          onClose={() => setShowPreflight(false)}
+        />
+      )}
     </div>
   )
 }

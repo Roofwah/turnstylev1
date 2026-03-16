@@ -1,0 +1,351 @@
+# Turnstyle Preflight Engine – Claude Design Prompt
+
+## Purpose
+
+This prompt asks Claude to design the **Turnstyle Preflight Terms & Conditions Review Engine**.
+
+Turnstyle generates **trade promotion Terms & Conditions** (primarily for Australian promotions).  
+The Preflight Engine should automatically review generated terms before publication.
+
+The goal is **compliance-oriented drafting review**, not legal advice.
+
+The system should produce:
+
+- Score out of 100
+- Risk rating
+- Critical issues
+- Warnings
+- Missing clauses
+- Internal inconsistencies
+- Builder-to-terms mismatches
+- Suggested fixes
+- Suggested rewrite wording
+- Structured JSON output for a SaaS UI
+
+---
+
+# Prompt for Claude
+
+You are acting as a **senior legal-tech product architect, compliance systems designer, and AI workflow engineer**.
+
+I am building a SaaS platform called **Turnstyle** that generates **trade promotion Terms & Conditions** for marketing campaigns, primarily for **Australian promotions**.
+
+I want you to help me design the **full architecture** for a feature called:
+
+## Turnstyle Preflight
+
+This feature reviews generated Terms & Conditions before publication and produces:
+
+- a score out of 100
+- a risk rating
+- a list of critical issues
+- a list of warnings
+- a list of missing clauses
+- a list of internal inconsistencies
+- suggested fixes
+- suggested replacement wording
+- structured output suitable for rendering in a SaaS UI
+
+This is **not legal advice**.  
+It is a **compliance-oriented drafting quality assurance system**.
+
+I want a **practical system design suitable for production SaaS**.
+
+---
+
+# Product Context
+
+Turnstyle already captures structured campaign data from a builder form.
+
+Examples:
+
+- promoter
+- promoter ABN
+- promotion type
+- website
+- states / territories where promotion operates
+- promotion start date
+- promotion end date
+- draw date
+- draw location
+- unclaimed prize draw date
+- unclaimed prize draw location
+- number of winners
+- number of reserve entries
+- entry mechanic
+- qualifying purchase threshold
+- GST treatment
+- prize descriptions
+- prize values
+- total prize pool
+- travel prize yes/no
+- event prize yes/no
+- instant win yes/no
+- trade promotion vs retail promotion
+- entrant type
+- age restrictions
+- loyalty membership requirements
+- publication requirements
+- notification requirements
+- permit states
+- permit numbers placeholders
+- privacy policy URL
+- claim deadline
+- claim method
+- whether winners are individuals or businesses
+- whether minors can enter
+- whether guardian consent is required
+
+Turnstyle then generates Terms & Conditions from modular templates.
+
+---
+
+# Core Objective
+
+Design the best system for:
+
+## 1. Objective validation
+
+Use deterministic rules to detect:
+
+- date logic errors
+- prize pool math errors
+- missing mandatory sections
+- state/permit mismatches
+- invalid structural combinations
+- builder-to-terms mismatches
+- inconsistencies in counts, values, dates, ages, or locations
+
+---
+
+## 2. Qualitative review
+
+Use AI to detect:
+
+- ambiguous wording
+- vague prize descriptions
+- duplicated wording
+- contradictory clauses
+- operational impracticality
+- drafting weakness
+- risky discretion wording
+- missing nuance for special prize types
+- readability and legal-style issues
+
+---
+
+## 3. Scoring
+
+Generate:
+
+- overall score out of 100
+- weighted category scores
+- risk band
+- readiness status
+
+---
+
+# Hybrid Architecture Requirement
+
+The system must use a layered model.
+
+## Layer 1 — Deterministic Rules Engine
+
+Examples:
+
+- draw date must occur after promotion close date
+- unclaimed draw must occur after original draw
+- total prize pool must equal prize count × value
+- if travel prize exists → travel clause must exist
+- if entrants under 18 allowed → guardian clause required
+- if instant win promotion → draw clause must not exist
+- if promotion operates in SA/ACT → permit placeholders required
+- if publication required → publication clause required
+
+---
+
+## Layer 2 — Clause Extraction / Classification
+
+Identify sections such as:
+
+- promoter
+- eligibility
+- entry mechanics
+- draw mechanics
+- prize description
+- travel conditions
+- notification
+- publication
+- unclaimed prizes
+- privacy
+- liability
+
+---
+
+## Layer 3 — AI Review
+
+AI should review:
+
+- ambiguity
+- contradictions
+- missing nuance
+- operational weaknesses
+- drafting quality
+- unclear prize descriptions
+
+---
+
+## Layer 4 — Score Aggregation
+
+Combine rule results and AI review into final score.
+
+---
+
+# Scoring Model
+
+| Category | Weight |
+|---|---|
+Structural completeness | 15  
+Date and timeline integrity | 10  
+Eligibility clarity | 10  
+Entry mechanic clarity | 10  
+Prize clarity | 10  
+Draw mechanics | 10  
+Winner notification | 8  
+Unclaimed prize handling | 8  
+Special prize conditions | 8  
+Privacy/liability | 6  
+Drafting quality | 5  
+
+Total = 100
+
+---
+
+# Issue Types
+
+Please distinguish between:
+
+### Critical Issues
+Terms are not publication-ready.
+
+### Warnings
+Should be fixed before launch.
+
+### Enhancements
+Optional improvements.
+
+### Missing Clauses
+Expected clause absent.
+
+### Internal Inconsistencies
+Clauses conflict.
+
+### Builder Mismatches
+Builder data conflicts with text.
+
+---
+
+# Special Clause Expectations
+
+Travel prizes require:
+
+- booking and availability wording
+- exclusions
+- companion travel
+- itinerary control
+- identification requirements
+- travel insurance
+- event cancellation wording
+
+Event prizes require:
+
+- rescheduling wording
+- ticket conditions
+- venue compliance wording
+
+Under-18 entrants require:
+
+- guardian consent clause
+
+Trade promotions require:
+
+- trade account eligibility conditions
+
+---
+
+# Deliverables Requested
+
+Please produce:
+
+1. Full system architecture
+2. Terms data model schema
+3. Clause classification method
+4. Rules engine design
+5. Sample rule library (25+ rules)
+6. Scoring engine design
+7. AI review prompt
+8. JSON output schema
+9. UI design suggestions
+10. Implementation roadmap (v1 → v3)
+11. Risks and failure modes
+
+Provide **practical technical design**, not high-level theory.
+
+---
+
+# Additional Instruction
+
+The system must leverage:
+
+- builder inputs
+- clause libraries
+- promotion type logic
+- prize type logic
+- state selection logic
+
+The goal is a **high-trust preflight engine** that is:
+
+- structured
+- campaign-aware
+- rules-driven
+- explainable
+- version-controlled
+
+---
+
+# Final Output Requirements
+
+At the end include:
+
+1. MVP architecture
+2. sample JSON response
+3. top 10 rules to implement first
+4. AI reviewer prompt
+
+---
+
+# Second Prompt – Generate Implementation Assets
+
+After completing the design above, please generate:
+
+1. **TypeScript interfaces** for:
+   - CampaignBuilderInput
+   - TermsDocument
+   - Clause
+   - PreflightIssue
+   - PreflightScore
+   - PreflightReport
+
+2. **Rules engine object structure**
+
+3. Example **rules file**
+
+4. Example **preflight API response**
+
+5. Suggested **project folder structure**
+
+6. Example **AI review prompt**
+
+7. Example **JSON response**
+
+Design these so they could be used in a **Node + TypeScript backend for a SaaS platform**.

@@ -129,6 +129,12 @@ These Terms and Conditions are governed by the laws of Australia. Participants s
 The Promoter's decisions in relation to this Promotion are final and no correspondence or communication will be entered into in relation to any aspect of this Promotion.
 The Promoter (or third parties on its behalf) may collect personal information (PI) to conduct the Promotion and disclose such PI to third parties for this purpose, including agents, contractors, service providers and prize suppliers. Validity of an eligible entrant's entry is conditional on providing this information. The Promoter may, for an indefinite period unless otherwise advised, use the information for promotional, marketing, publicity, research and profiling purposes, including sending electronic messages or telephoning the participant. All eligible entrants consent to their PI being collected and stored for this purpose in accordance with the Promoter's privacy policy available at repco.com.au/privacy which forms part of these T&Cs.  The Privacy Policy also contains information about how Eligible Entrants may opt out, access, update or correct their PI, how Eligible Entrants may complain about a breach of the Australian Privacy Principles or any other applicable law and how those complaints will be dealt with. All entries become the property of the Promoter.`,
   },
+
+    {
+    slug: 'permits',
+    label: 'Permit Numbers',
+    text: `Authorised in Australia: SA:T26/####; ACT: TP 26/#####; NSW: TP/000076`,
+  },
 ]
 
 export const TEMPLATE_META = {

@@ -401,6 +401,8 @@ export default function DevflowPage() {
         entryMechanic: drawMechanic === 'Game of Skill' ? 'Online - No Purchase' : (showEntry ? entryMechanic : ''),
         regions: (drawMechanic === 'Limited Offer' || drawMechanic === 'Game of Skill') ? ['national_au'] : regions,
         prizes: prizePayload,
+        requiredPermits: permitReadiness?.required ?? [],
+        maxStatePool: permitReadiness?.prizeForPermit ?? prizePoolTotal,
       })
     } finally {
       setSaving(false)

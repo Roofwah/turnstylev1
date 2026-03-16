@@ -19,7 +19,9 @@ export async function createCampaign(data: {
   drawFrequency: string
   entryMechanic: string
   regions: string[]
-  prizes: { tier: string; description: string; qty: number; unitValue: number }[]
+  prizes: { tier: string; description: string; type?: string; qty: number; unitValue: number }[]
+  requiredPermits?: string[]    // states requiring permits e.g. ['ACT', 'SA']
+  maxStatePool?: number         // per-state prize pool used for permit threshold calculation
 }) {
   const prizePoolTotal = data.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
 
@@ -90,6 +92,8 @@ export async function createCampaign(data: {
       notes: data.notes || null,
       mechanicType,
       status: 'DRAFT',
+      requiredPermits: data.requiredPermits ?? [],
+      maxStatePool: data.maxStatePool ?? 0,
     },
   })
 // Auto-generate quote immediately

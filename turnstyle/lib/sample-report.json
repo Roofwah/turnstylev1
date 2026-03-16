@@ -1,0 +1,133 @@
+{
+  "reportId": "f3a2b1c0-1234-5678-abcd-ef0123456789",
+  "campaignId": "repco-supercars-2026",
+  "generatedAt": "2026-03-16T10:00:00.000Z",
+  "score": {
+    "total": 61,
+    "riskBand": "HIGH_RISK",
+    "readinessStatus": "High risk — significant issues require attention",
+    "categoryScores": [
+      { "category": "STRUCTURAL",          "weight": 15, "rawScore": 100, "weightedScore": 15.0, "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 0 } },
+      { "category": "DATE_TIMELINE",       "weight": 10, "rawScore": 100, "weightedScore": 10.0, "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 0 } },
+      { "category": "ELIGIBILITY",         "weight": 10, "rawScore": 100, "weightedScore": 10.0, "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 0 } },
+      { "category": "PRIZE",               "weight": 10, "rawScore": 80,  "weightedScore": 8.0,  "issueCount": { "critical": 0, "error": 1, "warning": 0, "notice": 0 } },
+      { "category": "DRAW_MECHANICS",      "weight": 10, "rawScore": 100, "weightedScore": 10.0, "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 0 } },
+      { "category": "BUILDER_MISMATCH",    "weight": 5,  "rawScore": 0,   "weightedScore": 0.0,  "issueCount": { "critical": 2, "error": 0, "warning": 0, "notice": 0 } },
+      { "category": "TRAVEL_PRIZE",        "weight": 5,  "rawScore": 98,  "weightedScore": 4.9,  "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 1 } },
+      { "category": "PRIVACY_LIABILITY",   "weight": 6,  "rawScore": 100, "weightedScore": 6.0,  "issueCount": { "critical": 0, "error": 0, "warning": 0, "notice": 0 } }
+    ],
+    "penaltyBreakdown": [
+      { "ruleId": "RULE-PRIZE-02",    "severity": "ERROR",    "penalty": 10 },
+      { "ruleId": "RULE-BUILDER-01",  "severity": "CRITICAL", "penalty": 20 },
+      { "ruleId": "AI-001",           "severity": "WARNING",  "penalty": 5  },
+      { "ruleId": "RULE-PERMIT-02",   "severity": "ERROR",    "penalty": 10 },
+      { "ruleId": "RULE-TRAVEL-02",   "severity": "NOTICE",   "penalty": 2  },
+      { "ruleId": "AI-002",           "severity": "WARNING",  "penalty": 5  }
+    ]
+  },
+  "issues": [
+    {
+      "ruleId": "RULE-BUILDER-01",
+      "severity": "CRITICAL",
+      "category": "BUILDER_MISMATCH",
+      "title": "Winner count mismatch detected",
+      "description": "Terms state '6 Winners' in the draw clause but the builder is configured for 6 — verify the terms were regenerated after the last builder change.",
+      "affectedClause": "draw_mechanics",
+      "builderField": "numberOfWinners",
+      "suggestedFix": "Regenerate terms or manually verify winner count matches builder value of 6.",
+      "sourceLayer": "rules"
+    },
+    {
+      "ruleId": "RULE-PRIZE-02",
+      "severity": "ERROR",
+      "category": "PRIZE",
+      "title": "Contradictory prize value wording",
+      "description": "The prize description contains both 'valued up to $3,000' and 'valued at $3,000.00' in the same sentence. These are contradictory qualifiers that create ambiguity about the guaranteed prize value.",
+      "affectedClause": "prize_description",
+      "suggestedFix": "Use 'valued up to $3,000 (incl. GST)' consistently — this is correct for travel prizes where value varies by departure location.",
+      "suggestedRewrite": "6 x Gold Coast Supercars Weekend (23–25 October 2026) for two (2) people, including event general admission, return economy airfare (if applicable), and three (3) nights' accommodation (minimum 3 star), each valued up to $3,000 (incl. GST) depending on departure location.",
+      "sourceLayer": "rules"
+    },
+    {
+      "ruleId": "RULE-PERMIT-02",
+      "severity": "ERROR",
+      "category": "STRUCTURAL",
+      "title": "SA and ACT permit placeholders not filled",
+      "description": "Permit numbers for SA (T26/####) and ACT (TP 26/#####) contain unfilled placeholders. NSW has a valid permit number (TP/000076) — SA and ACT are inconsistent.",
+      "affectedClause": "permits",
+      "builderField": "permitNumbers",
+      "suggestedFix": "Obtain SA and ACT permit numbers and replace the #### placeholders before publishing.",
+      "sourceLayer": "rules"
+    },
+    {
+      "ruleId": "AI-001",
+      "severity": "WARNING",
+      "category": "TRAVEL_PRIZE",
+      "title": "Ancillary cost exclusions duplicated",
+      "description": "The travel prize clause lists ancillary exclusions (travel insurance, visas, meals, transfers etc.) in two separate paragraphs. This creates a risk that any inconsistency between the two lists could be exploited by claimants.",
+      "affectedClause": "travel_conditions",
+      "suggestedFix": "Consolidate ancillary exclusions into a single definitive paragraph and remove the duplicate.",
+      "sourceLayer": "ai"
+    },
+    {
+      "ruleId": "AI-002",
+      "severity": "WARNING",
+      "category": "PRIZE",
+      "title": "Itinerary control wording is operationally weak",
+      "description": "The clause states the itinerary will be determined 'in consultation with the winner' — this creates an obligation to consult that may be difficult to fulfil at scale with 6 winners.",
+      "affectedClause": "travel_conditions",
+      "suggestedFix": "Strengthen promoter discretion. Consider: 'The itinerary will be determined by the Promoter and, where practicable, in consultation with the winner.'",
+      "suggestedRewrite": "The itinerary will be determined by the Promoter. The Promoter may, where reasonably practicable, consult with the winner regarding travel preferences, but the Promoter's determination of the final itinerary is conclusive.",
+      "sourceLayer": "ai"
+    },
+    {
+      "ruleId": "RULE-TRAVEL-02",
+      "severity": "NOTICE",
+      "category": "TRAVEL_PRIZE",
+      "title": "Travel insurance recommendation present ✓",
+      "description": "Travel insurance recommendation wording found — compliant.",
+      "affectedClause": "travel_conditions",
+      "sourceLayer": "rules"
+    }
+  ],
+  "missingClauses": [],
+  "builderMismatches": [
+    {
+      "ruleId": "RULE-BUILDER-01",
+      "severity": "CRITICAL",
+      "category": "BUILDER_MISMATCH",
+      "title": "Winner count mismatch detected",
+      "description": "Terms state '6 Winners' in the draw clause but the builder is configured for 6 — verify the terms were regenerated after the last builder change.",
+      "affectedClause": "draw_mechanics",
+      "builderField": "numberOfWinners",
+      "suggestedFix": "Regenerate terms or manually verify winner count matches builder value of 6.",
+      "sourceLayer": "rules"
+    }
+  ],
+  "summary": {
+    "criticalCount": 1,
+    "errorCount": 2,
+    "warningCount": 2,
+    "noticeCount": 1,
+    "isPublishReady": false,
+    "topIssues": [
+      {
+        "ruleId": "RULE-BUILDER-01",
+        "severity": "CRITICAL",
+        "title": "Winner count mismatch detected"
+      },
+      {
+        "ruleId": "RULE-PRIZE-02",
+        "severity": "ERROR",
+        "title": "Contradictory prize value wording"
+      },
+      {
+        "ruleId": "RULE-PERMIT-02",
+        "severity": "ERROR",
+        "title": "SA and ACT permit placeholders not filled"
+      }
+    ]
+  },
+  "aiReviewUsed": true,
+  "aiReviewTokensUsed": 3240
+}
