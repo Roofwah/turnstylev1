@@ -414,11 +414,24 @@ export const ALL_RULES: RuleFn[] = [
   RULE_PRIV_02,
 ]
 
+/**
+ * Rules that operate purely on document text and require no CampaignBuilderInput context.
+ * Used by the standalone document preflight path (upload flow).
+ * Builder-dependent rules (dates, prize pool maths, mismatch checks) are excluded.
+ */
+export const DOCUMENT_SAFE_RULES: RuleFn[] = [
+  RULE_PERMIT_01, // Detects unfilled permit placeholders (#### patterns) — text only
+  RULE_PRIZE_02,  // Detects contradictory "valued up to" / "valued at" wording — text only
+  RULE_PRIV_01,   // Checks for presence of a privacy clause — text only
+]
+
 export function runRules(
   builder: CampaignBuilderInput,
-  doc: TermsDocument
+  doc: TermsDocument,
+  options?: { documentOnly?: boolean }
 ): PreflightIssue[] {
-  return ALL_RULES.map((rule) => rule(builder, doc)).filter(
+  const rules = options?.documentOnly ? DOCUMENT_SAFE_RULES : ALL_RULES
+  return rules.map((rule) => rule(builder, doc)).filter(
     (result): result is PreflightIssue => result !== null
   )
 }

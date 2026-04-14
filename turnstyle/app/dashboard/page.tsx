@@ -74,6 +74,7 @@ export default async function DashboardPage() {
           <div className="hidden md:flex items-center gap-6">
             <span className="text-white text-sm font-semibold">Campaigns</span>
             <Link href="/dashboard/terms-test" className="text-white/60 hover:text-white text-sm transition-colors">Terms Test</Link>
+            <Link href="/dashboard/preflight" className="text-white/60 hover:text-white text-sm transition-colors">Preflight</Link>
             <span className="text-white/30 text-sm cursor-not-allowed">Templates</span>
             <span className="text-white/30 text-sm cursor-not-allowed">Reports</span>
           </div>
@@ -99,6 +100,13 @@ export default async function DashboardPage() {
               className="text-white/50 hover:text-white text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap"
             >
               Devflow
+            </Link>
+            <Link
+              href="/dashboard/preflight"
+              className="border border-white/[0.12] text-white/60 hover:text-white hover:border-white/30 font-semibold text-xs sm:text-sm px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg sm:rounded-xl transition-all flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <span className="hidden sm:inline">Preflight Terms</span>
+              <span className="sm:hidden">Preflight</span>
             </Link>
             <Link
               href="/dashboard/new"

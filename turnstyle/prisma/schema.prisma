@@ -365,3 +365,34 @@ model TermsApproval {
 
   @@map("terms_approvals")
 }
+
+// ─── Standalone Preflight Upload ──────────────
+// Parallel path: upload an existing .docx for preflight
+// without requiring a campaign to exist in the wizard flow.
+
+model TermsUpload {
+  id            String    @id @default(uuid())
+  filename      String
+  fileSize      Int       @map("file_size")
+  extractedText String    @map("extracted_text") @db.Text
+  wordCount     Int       @default(0) @map("word_count")
+  uploadedAt    DateTime  @default(now()) @map("uploaded_at")
+
+  report        TermsUploadReport?
+
+  @@map("terms_uploads")
+}
+
+model TermsUploadReport {
+  id          String      @id @default(uuid())
+  uploadId    String      @unique @map("upload_id")
+  score       Int
+  riskBand    String      @map("risk_band")
+  issueCount  Int         @map("issue_count")
+  reportJson  Json        @map("report_json")
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  upload TermsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@map("terms_upload_reports")
+}

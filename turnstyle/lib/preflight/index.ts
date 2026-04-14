@@ -78,7 +78,7 @@ function buildSummary(issues: PreflightIssue[]) {
 export async function runPreflight(
   builder: CampaignBuilderInput,
   rawTermsText: string,
-  options: { skipAiReview?: boolean } = {}
+  options: { skipAiReview?: boolean; documentOnly?: boolean } = {}
 ): Promise<PreflightReport> {
   // ── Layer 1: Classify clauses ──────────────
   const doc = classifyClauses(rawTermsText, builder.campaignId)
@@ -93,7 +93,8 @@ export async function runPreflight(
   const missingIssues = missingClauseIssues(missingClauses)
 
   // ── Layer 3: Run deterministic rules ───────
-  const ruleIssues = runRules(builder, doc)
+  // documentOnly: true restricts to text-safe rules only (upload preflight path)
+  const ruleIssues = runRules(builder, doc, { documentOnly: options.documentOnly })
 
   // ── Layer 4: AI review (optional, default on)
   let aiIssues: PreflightIssue[] = []
