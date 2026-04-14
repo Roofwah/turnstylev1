@@ -12,11 +12,12 @@ import type { PreflightReport } from '@/lib/preflight/types'
 export const dynamic = 'force-dynamic'
 
 interface PageProps {
-  params: { uploadId: string }
+  // Next.js 15+ passes params as a Promise — must be awaited
+  params: Promise<{ uploadId: string }>
 }
 
 export default async function PreflightReportPage({ params }: PageProps) {
-  const { uploadId } = params
+  const { uploadId } = await params
 
   // Fetch upload + its report in one query
   const upload = await prisma.termsUpload.findUnique({
