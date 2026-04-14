@@ -384,13 +384,17 @@ model TermsUpload {
 }
 
 model TermsUploadReport {
-  id          String      @id @default(uuid())
-  uploadId    String      @unique @map("upload_id")
-  score       Int
-  riskBand    String      @map("risk_band")
-  issueCount  Int         @map("issue_count")
-  reportJson  Json        @map("report_json")
-  createdAt   DateTime    @default(now()) @map("created_at")
+  id              String      @id @default(uuid())
+  uploadId        String      @unique @map("upload_id")
+  score           Int
+  riskBand        String      @map("risk_band")
+  issueCount      Int         @map("issue_count")
+  reportJson      Json        @map("report_json")
+  extractionJson  Json?       @map("extraction_json")
+  reviewJson      Json?       @map("review_json")
+  recommendation  String?
+  draftSeedJson   Json?       @map("draft_seed_json")
+  createdAt       DateTime    @default(now()) @map("created_at")
 
   upload TermsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 

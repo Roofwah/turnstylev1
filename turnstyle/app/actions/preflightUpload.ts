@@ -10,15 +10,22 @@
 //   1. Validate the uploaded File (type, size)
 //   2. Extract plain text via mammoth
 //   3. Persist TermsUpload record
-//   4. Run runPreflightOnDocument()
-//   5. Persist TermsUploadReport
-//   6. Return the uploadId for redirect
+//   4. Run runPreflightOnDocument() (structural/rule checks)
+//   5. Run extractCampaignSchemaFromTerms() (field extraction)
+//   6. Run reviewDocument() (concept review + scoring)
+//   7. Run mapExtractedSchemaToCampaignDraftSeed() (rebuild seed)
+//   8. Persist TermsUploadReport with all payloads
+//   9. Return the uploadId for redirect
 // ─────────────────────────────────────────────
 
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { extractTextFromDocx } from '@/lib/preflight-upload/extractDocx'
 import { runPreflightOnDocument } from '@/lib/preflight-upload/runPreflightOnDocument'
+import { normaliseForClassifier } from '@/lib/preflight-upload/normaliseForClassifier'
+import { extractCampaignSchemaFromTerms } from '@/lib/preflight-extraction'
+import { reviewDocument } from '@/lib/preflight-review'
+import { mapExtractedSchemaToCampaignDraftSeed } from '@/lib/preflight-rebuild'
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 
@@ -98,7 +105,7 @@ export async function uploadAndPreflightTerms(
     },
   })
 
-  // ── 4. Run preflight ─────────────────────────
+  // ── 4. Run structural preflight ──────────────
   let report: Awaited<ReturnType<typeof runPreflightOnDocument>>
 
   try {
@@ -108,7 +115,6 @@ export async function uploadAndPreflightTerms(
     })
   } catch (err) {
     console.error('[preflightUpload] preflight error:', err)
-    // Best-effort cleanup — don't fail silently if delete fails
     await prisma.termsUpload.delete({ where: { id: uploadId } }).catch(() => undefined)
     return {
       success: false,
@@ -116,19 +122,47 @@ export async function uploadAndPreflightTerms(
     }
   }
 
-  // ── 5. Persist report ────────────────────────
+  // ── 5. Run extraction ────────────────────────
+  // Use normalised text (same as preflight engine used)
+  const normalisedText = normaliseForClassifier(extraction.text)
+  let extractionSchema: Awaited<ReturnType<typeof extractCampaignSchemaFromTerms>>
+  let reviewResult: Awaited<ReturnType<typeof reviewDocument>>
+  let draftSeed: Awaited<ReturnType<typeof mapExtractedSchemaToCampaignDraftSeed>>
+
+  try {
+    extractionSchema = extractCampaignSchemaFromTerms(normalisedText, file.name)
+    reviewResult = reviewDocument(normalisedText, extractionSchema)
+    draftSeed = mapExtractedSchemaToCampaignDraftSeed(extractionSchema)
+  } catch (err) {
+    // Extraction/review failures are non-fatal — we still have the structural report
+    console.error('[preflightUpload] extraction/review error:', err)
+    // Fall through with nulls — handled below
+    extractionSchema = null as never
+    reviewResult = null as never
+    draftSeed = null as never
+  }
+
+  // ── 6. Persist report ────────────────────────
   await prisma.termsUploadReport.create({
     data: {
       uploadId,
       score: report.score.total,
       riskBand: report.score.riskBand,
       issueCount: report.issues.length,
-      // Store the full report as JSON for the report page to read
-      // Prisma expects Prisma.InputJsonValue — round-trip through JSON to satisfy the type
       reportJson: JSON.parse(JSON.stringify(report)),
+      ...(extractionSchema && {
+        extractionJson: JSON.parse(JSON.stringify(extractionSchema)),
+      }),
+      ...(reviewResult && {
+        reviewJson: JSON.parse(JSON.stringify(reviewResult)),
+        recommendation: reviewResult.recommendation.code,
+      }),
+      ...(draftSeed && {
+        draftSeedJson: JSON.parse(JSON.stringify(draftSeed)),
+      }),
     },
   })
 
-  // ── 6. Return ────────────────────────────────
+  // ── 7. Return ────────────────────────────────
   return { success: true, uploadId }
 }

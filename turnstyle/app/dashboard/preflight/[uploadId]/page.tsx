@@ -8,6 +8,9 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { PreflightUploadReportView } from '@/components/PreflightUploadReportView'
 import type { PreflightReport } from '@/lib/preflight/types'
+import type { ExtractedCampaignSchema } from '@/lib/preflight-extraction/types'
+import type { DocumentReview } from '@/lib/preflight-review/types'
+import type { CampaignDraftSeed } from '@/lib/preflight-rebuild/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,8 +32,17 @@ export default async function PreflightReportPage({ params }: PageProps) {
     notFound()
   }
 
-  // Deserialise the stored JSON back to PreflightReport
+  // Deserialise the stored JSON payloads
   const report = upload.report.reportJson as unknown as PreflightReport
+  const extraction = upload.report.extractionJson
+    ? (upload.report.extractionJson as unknown as ExtractedCampaignSchema)
+    : null
+  const review = upload.report.reviewJson
+    ? (upload.report.reviewJson as unknown as DocumentReview)
+    : null
+  const draftSeed = upload.report.draftSeedJson
+    ? (upload.report.draftSeedJson as unknown as CampaignDraftSeed)
+    : null
 
   const bandConfig: Record<string, { color: string }> = {
     EXCELLENT:     { color: 'text-emerald-400' },
@@ -124,6 +136,9 @@ export default async function PreflightReportPage({ params }: PageProps) {
           filename={upload.filename}
           wordCount={upload.wordCount}
           uploadedAt={upload.uploadedAt.toISOString()}
+          extraction={extraction}
+          review={review}
+          draftSeed={draftSeed}
         />
       </main>
     </div>
