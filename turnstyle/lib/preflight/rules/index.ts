@@ -253,7 +253,13 @@ const RULE_ELIG_01: RuleFn = (builder, doc) => {
 // ─── Permit Rules ─────────────────────────────
 
 const RULE_PERMIT_01: RuleFn = (builder, doc) => {
-  const hasPlaceholder = /T\d{2}\/#{3,}|TP\s*\d{2}\/#{3,}/i.test(doc.rawText)
+  // Match permit numbers that still contain placeholder characters.
+  // Australian permits follow T##/... or TP##/... prefixes.
+  // Both #### and XXXX placeholders are in common use:
+  //   TP26/XXXX  (ACT placeholder)   T26/0XXXX (SA placeholder)
+  //   T26/####   (legacy style)
+  // [\dX#]* allows optional leading digits before the placeholder run.
+  const hasPlaceholder = /T\d{2}\/[\dX#]*[X#]{3,}|TP\s*\d{2}\/[\dX#]*[X#]{3,}/i.test(doc.rawText)
   if (hasPlaceholder) {
     return issue({
       ruleId: 'RULE-PERMIT-02',
@@ -270,7 +276,7 @@ const RULE_PERMIT_01: RuleFn = (builder, doc) => {
 }
 
 const RULE_PERMIT_02: RuleFn = (builder, doc) => {
-  const hasPlaceholder = /T\d{2}\/#{3,}|TP\s*\d{2}\/#{3,}/i.test(doc.rawText)
+  const hasPlaceholder = /T\d{2}\/[\dX#]*[X#]{3,}|TP\s*\d{2}\/[\dX#]*[X#]{3,}/i.test(doc.rawText)
   if (hasPlaceholder) return null
 
   const needsSA  = builder.permitStates.includes('SA')  && !builder.permitNumbers.SA
@@ -292,7 +298,7 @@ const RULE_PERMIT_02: RuleFn = (builder, doc) => {
 }
 
 const RULE_PERMIT_03: RuleFn = (builder, doc) => {
-  const hasPlaceholder = /T\d{2}\/#{3,}|TP\s*\d{2}\/#{3,}/i.test(doc.rawText)
+  const hasPlaceholder = /T\d{2}\/[\dX#]*[X#]{3,}|TP\s*\d{2}\/[\dX#]*[X#]{3,}/i.test(doc.rawText)
   if (hasPlaceholder) return null
 
   if (builder.permitStates.includes('NSW') && !builder.permitNumbers.NSW) {

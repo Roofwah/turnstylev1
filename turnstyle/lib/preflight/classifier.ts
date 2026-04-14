@@ -9,7 +9,7 @@ import { Clause, ClauseType, TermsDocument } from './types'
 // Maps heading patterns → clause types
 const CLAUSE_PATTERNS: { pattern: RegExp; type: ClauseType }[] = [
   { pattern: /^promoter$/i,                                         type: 'promoter' },
-  { pattern: /^promotional\s+period$/i,                             type: 'promotional_period' },
+  { pattern: /^promotion(?:al)?\s+period$/i,                        type: 'promotional_period' },
   { pattern: /^(who\s+can\s+enter|eligibilit)/i,                   type: 'eligibility' },
   { pattern: /^who\s+is\s+ineligible/i,                            type: 'eligibility' },
   { pattern: /^(how\s+to\s+enter|entry\s+method|entry\s+mechanic)/i, type: 'entry_mechanic' },
@@ -17,11 +17,11 @@ const CLAUSE_PATTERNS: { pattern: RegExp; type: ClauseType }[] = [
   { pattern: /^(number\s+of\s+winners|how.*selected|draw)/i,       type: 'draw_mechanics' },
   { pattern: /^travel\s+prize\s+condition/i,                       type: 'travel_conditions' },
   { pattern: /^event\s+prize\s+condition/i,                        type: 'event_conditions' },
-  { pattern: /^winner\s+notification/i,                            type: 'winner_notification' },
+  { pattern: /^(winner\s+notification|how\s+will\s+the\s+winner|contacting\s+the\s+winner)/i, type: 'winner_notification' },
   { pattern: /^unclaimed\s+prize/i,                                type: 'unclaimed_prizes' },
   { pattern: /^(privacy|personal\s+information|miscellaneous)/i,   type: 'privacy' },
   { pattern: /^(liability|limitation)/i,                           type: 'liability' },
-  { pattern: /^permit\s+number/i,                                  type: 'permits' },
+  { pattern: /^permit\s+numbers?/i,                                 type: 'permits' },
   { pattern: /^(how\s+often|additionals)/i,                        type: 'entry_mechanic' },
   { pattern: /^(acceptance|promotion\s+type|website|where\s+is)/i, type: 'miscellaneous' },
 ]

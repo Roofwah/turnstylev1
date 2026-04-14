@@ -19,6 +19,7 @@
 
 import { randomUUID } from 'crypto'
 import { runPreflight } from '../preflight/index'
+import { normaliseForClassifier } from './normaliseForClassifier'
 import type { CampaignBuilderInput, PreflightReport } from '../preflight/types'
 
 export interface DocumentPreflightOptions {
@@ -101,9 +102,15 @@ export async function runPreflightOnDocument(
   options: DocumentPreflightOptions = {}
 ): Promise<PreflightReport> {
   const filename = options.filename ?? 'Uploaded document'
-  const builder = buildStubBuilder(uploadId, filename, rawText)
 
-  const report = await runPreflight(builder, rawText, {
+  // Normalise external document format (table-extracted, heading-based)
+  // into the \n---\n section format the classifier expects.
+  // Turnstyle-generated terms pass through unchanged.
+  const normalisedText = normaliseForClassifier(rawText)
+
+  const builder = buildStubBuilder(uploadId, filename, normalisedText)
+
+  const report = await runPreflight(builder, normalisedText, {
     skipAiReview: options.skipAiReview ?? true,
     documentOnly: true,
   })
