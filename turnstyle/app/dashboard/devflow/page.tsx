@@ -221,9 +221,23 @@ export default function DevflowPage() {
       nationalOrState === 'national' ? 1 : Math.max(0, stateRegions.length)
     const effectiveRegions = regionCount > 0 ? regionCount : 1
     const drawCount = structureDrawCount * effectiveRegions
+    // Permit fee: use per-state pool (same logic as permitReadiness) so the
+    // fee bracket matches which permits are actually required
+    const isStateBased = nationalOrState !== 'national' && stateRegions.length > 0
+    const permitRegionCount = isStateBased ? stateRegions.length : 1
+    const prizeForPermit = permitRegionCount > 1 ? prizePool / permitRegionCount : prizePool
+    // Determine if any state actually requires a permit (mirrors permitReadiness logic)
+    const hasNsw = nationalOrState === 'national' || stateRegions.some(s => s === 'NSW/ACT' || s === 'NSW')
+    const hasSa  = nationalOrState === 'national' || stateRegions.some(s => s === 'SA/NT' || s === 'WA/SA/NT' || s === 'SA')
+    const hasAct = nationalOrState === 'national' || stateRegions.some(s => s === 'NSW/ACT' || s === 'ACT')
+    const anyPermitRequired = !noPermit && (
+      (hasAct && prizeForPermit > 3000) ||
+      (hasSa  && prizeForPermit > 5000) ||
+      (hasNsw && prizeForPermit > 10000)
+    )
     const termsFee = calcTermsFee(promoType, prizePool)
     const mgmtFee = calcMgmtFee(promoType, prizePool)
-    const permitFee = noPermit ? 0 : calcPermitFee(prizePool)
+    const permitFee = anyPermitRequired ? calcPermitFee(prizeForPermit) : 0
     const drawFee = noDrawFee ? 0 : calcDrawFee(drawCount)
     const totalExGst = termsFee + mgmtFee + permitFee + drawFee
     const gstAmount = Math.round(totalExGst * 0.1 * 100) / 100
@@ -403,6 +417,8 @@ export default function DevflowPage() {
         prizes: prizePayload,
         requiredPermits: permitReadiness?.required ?? [],
         maxStatePool: permitReadiness?.prizeForPermit ?? prizePoolTotal,
+        overrideDrawCount: diagnostics?.drawCount,
+        overridePermitFee: diagnostics?.permitFee,
       })
     } finally {
       setSaving(false)

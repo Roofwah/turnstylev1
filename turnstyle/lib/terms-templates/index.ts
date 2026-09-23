@@ -19,6 +19,7 @@
 
 import { REPCO_TRADE,   TEMPLATE_META as REPCO_TRADE_META   } from './repco-trade'
 import { REPCO_RETAIL,  TEMPLATE_META as REPCO_RETAIL_META  } from './repco-retail'
+import { REPCO_LIMITEDOFFER, TEMPLATE_META as REPCO_LIMITEDOFFER_META } from './repco-limitedoffer'
 import { NAPA_TRADE,    TEMPLATE_META as NAPA_META           } from './napa-trade'
 import { GENERIC_SWEEPSTAKES, TEMPLATE_META as GENERIC_META } from './generic-sweepstakes'
 import { getSubTemplateClausesForPrizeTypes } from './sub-templates'
@@ -125,6 +126,17 @@ export const TEMPLATE_REGISTRY: TemplateEntry[] = [
       isActive:      true,
     } as TemplateMeta,
     clauses: REPCO_RETAIL as TemplateClause[],
+  },
+  {
+    meta: {
+      ...REPCO_LIMITEDOFFER_META,
+      mechanic:      'limited_offer',
+      drawFrequency: 'at_conclusion',
+      entryMechanic: 'online_form',
+      description:   'Repco Limited Offer — limited offer game of chance',
+      isActive:      true,
+    } as TemplateMeta,
+    clauses: REPCO_LIMITEDOFFER as TemplateClause[],
   },
   {
     meta: {

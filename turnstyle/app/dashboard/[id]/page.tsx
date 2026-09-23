@@ -212,7 +212,9 @@ function CommandCentrePageInner() {
   const [confirmedAt, setConfirmedAt] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
   const [showPrizeWizard, setShowPrizeWizard] = useState(false)
-const [showDrawWizard, setShowDrawWizard] = useState(false)
+  const [showDrawWizard, setShowDrawWizard] = useState(false)
+  const [uploadEmail, setUploadEmail] = useState('')
+  const [uploadEmailSaving, setUploadEmailSaving] = useState(false)
 
   useEffect(() => {
     const tabParam = searchParams.get('tab') as TabId | null

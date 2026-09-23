@@ -41,6 +41,7 @@ export interface QuoteInput {
   drawMechanic: string     // raw string from form e.g. "Sweepstakes - Random Draw"
   drawFrequency: string    // raw string from form e.g. "Weekly"
   overrideDrawCount?: number
+  overridePermitFee?: number   // if provided, skips calcPermitFee (use when caller has already applied state-based pool split)
   prizes: PrizeTier[]
   // Computed from prizes:
   prizePoolTotal?: number  // if not provided, computed from prizes array
@@ -99,7 +100,7 @@ export function calculateQuote(input: QuoteInput): QuoteResult {
   const termsFee  = calcTermsFee(promoType, prizePoolTotal)
   const mgmtFee   = calcMgmtFee(promoType, prizePoolTotal)
   const noPermit = ['draw_only', 'limited', 'game_of_skill', 'other'].includes(promoType)
-  const permitFee = noPermit ? 0 : calcPermitFee(prizePoolTotal)
+  const permitFee = noPermit ? 0 : (input.overridePermitFee ?? calcPermitFee(prizePoolTotal))
   const noDrawFee = ['limited', 'game_of_skill', 'other'].includes(promoType)
   const drawFee   = noDrawFee ? 0 : calcDrawFee(drawCount)
 

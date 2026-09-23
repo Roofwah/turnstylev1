@@ -89,6 +89,11 @@ model Campaign {
   confirmedPrizes    Json?     @map("confirmed_prizes")
   maxStatePool    Float?   @default(0) @map("max_state_pool")
 requiredPermits String[] @map("required_permits")
+  dropboxFolderUrl String? @map("dropbox_folder_url")
+  intakeSummary    String? @map("intake_summary") @db.Text
+  preflightScore   Int?    @map("preflight_score")
+  invoiceOpsStatus InvoiceOpsStatus @default(NOT_STARTED) @map("invoice_ops_status")
+  opsNotes         String? @map("ops_notes") @db.Text
 
   promoter      Promoter?           @relation(fields: [promoterId], references: [id])
   createdBy     User                @relation(fields: [createdById], references: [id])
@@ -97,8 +102,106 @@ requiredPermits String[] @map("required_permits")
   documents     GeneratedDocument[]
   auditLogs     AuditLog[]
   termsDrafts   TermsDraft[]
+  opsDocuments  PromotionDocument[]
+  opsDraws      PromotionDraw[]
 
   @@map("campaigns")
+}
+
+enum InvoiceOpsStatus {
+  NOT_STARTED
+  REQUIRED
+  ISSUED
+  PAID
+  NOT_APPLICABLE
+}
+
+enum OpsDocumentStatus {
+  NOT_STARTED
+  REQUIRED
+  WAITING_ON_CLIENT
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  APPROVED
+  LODGED
+  RECEIVED
+  COMPLETE
+  OVERDUE
+  NOT_APPLICABLE
+}
+
+enum DrawFileStatus {
+  NOT_REQUIRED
+  REQUIRED
+  REQUESTED
+  RECEIVED
+  CHECKED
+  READY_FOR_DRAW
+  USED_IN_DRAW
+  ARCHIVED
+}
+
+enum DrawCertificateStatus {
+  NOT_STARTED
+  GENERATED
+  REVIEWED
+  SENT_TO_CLIENT
+  SAVED_TO_DROPBOX
+}
+
+model PromotionDocument {
+  id              String            @id @default(uuid())
+  campaignId      String            @map("campaign_id")
+  fileType        String            @map("file_type")
+  folderLabel     String?           @map("folder_label")
+  required        Boolean           @default(true)
+  status          OpsDocumentStatus @default(NOT_STARTED)
+  dueDate         DateTime?         @map("due_date") @db.Date
+  dropboxFolder   String?           @map("dropbox_folder")
+  dropboxFileUrl  String?           @map("dropbox_file_url")
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, fileType])
+  @@index([campaignId])
+  @@index([status])
+  @@map("promotion_documents")
+}
+
+model PromotionDraw {
+  id                    String                @id @default(uuid())
+  campaignId            String                @map("campaign_id")
+  drawName              String                @map("draw_name")
+  drawNumber            Int                   @map("draw_number")
+  drawDate              DateTime              @map("draw_date") @db.Date
+  drawTime              String?               @map("draw_time")
+  drawLocation          String?               @map("draw_location")
+  entryPeriodStart      DateTime?             @map("entry_period_start") @db.Date
+  entryPeriodEnd        DateTime?             @map("entry_period_end") @db.Date
+  entryFileRequired     Boolean               @default(true) @map("entry_file_required")
+  entryFileStatus       DrawFileStatus        @default(REQUIRED) @map("entry_file_status")
+  entryFileDropboxUrl   String?               @map("entry_file_dropbox_url")
+  purerandomDrawStatus  String?               @map("purerandom_draw_status")
+  certificateStatus     DrawCertificateStatus @default(NOT_STARTED) @map("certificate_status")
+  certificateDropboxUrl String?               @map("certificate_dropbox_url")
+  winnerNotifyDue       DateTime?             @map("winner_notify_due") @db.Date
+  winnerNotifyStatus    OpsDocumentStatus     @default(NOT_STARTED) @map("winner_notify_status")
+  publicationRequired   Boolean               @default(false) @map("publication_required")
+  publicationDue        DateTime?             @map("publication_due") @db.Date
+  publicationStatus     OpsDocumentStatus     @default(NOT_STARTED) @map("publication_status")
+  permitReference       String?               @map("permit_reference")
+  notes                 String?
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([drawDate])
+  @@map("promotion_draws")
 }
 
 model PromoterTemplate {
@@ -399,4 +502,21 @@ model TermsUploadReport {
   upload TermsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 
   @@map("terms_upload_reports")
+}
+
+// Campaign brief received via email (Resend Inbound) or manual paste — draft until sent to builder.
+model CampaignIntakeDraft {
+  id            String   @id @default(uuid())
+  reviewToken   String   @unique @map("review_token")
+  fromEmail     String?  @map("from_email")
+  subject       String?
+  resendEmailId String?  @map("resend_email_id")
+  rawInput      String   @map("raw_input") @db.Text
+  intakeJson    Json     @map("intake_json")
+  source        String   @default("mock")
+  status        String   @default("pending_review")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("campaign_intake_drafts")
 }

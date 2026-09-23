@@ -22,6 +22,8 @@ export async function createCampaign(data: {
   prizes: { tier: string; description: string; type?: string; qty: number; unitValue: number }[]
   requiredPermits?: string[]    // states requiring permits e.g. ['ACT', 'SA']
   maxStatePool?: number         // per-state prize pool used for permit threshold calculation
+  overrideDrawCount?: number    // final draw count from devflow (includes structure + region multipliers)
+  overridePermitFee?: number    // permit fee already calculated using per-state pool in devflow
 }) {
   const prizePoolTotal = data.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
 
@@ -101,14 +103,16 @@ const prizes = data.prizes as any[]
 const prizePoolTotal2 = prizes.reduce((s: number, p: any) => s + p.qty * p.unitValue, 0)
 const { calculateQuote } = await import('@/lib/quote-engine')
 const quote = calculateQuote({
-  campaignId:    campaign.id,
-  tsCode:        campaign.tsCode,
-  campaignName:  campaign.name,
-  promoStart:    data.promoStart,
-  promoEnd:      data.promoEnd,
-  drawMechanic:  data.drawMechanic,
-  drawFrequency: data.drawFrequency,
-  prizes:        data.prizes,
+  campaignId:        campaign.id,
+  tsCode:            campaign.tsCode,
+  campaignName:      campaign.name,
+  promoStart:        data.promoStart,
+  promoEnd:          data.promoEnd,
+  drawMechanic:      data.drawMechanic,
+  drawFrequency:     data.drawFrequency,
+  prizes:            data.prizes,
+  overrideDrawCount: data.overrideDrawCount,
+  overridePermitFee: data.overridePermitFee,
 })
 
 await prisma.quote.create({

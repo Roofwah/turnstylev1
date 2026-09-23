@@ -22,7 +22,7 @@ export const REPCO_RETAIL = [
   {
     slug: 'type',
     label: 'Promotion Type',
-    text: `Trade Lottery - Game of Chance`,
+    text: `Limited offer – Chance plays no role in determining a winner.`,
   },
   {
     slug: 'website',
@@ -32,14 +32,19 @@ export const REPCO_RETAIL = [
   {
     slug: 'eligibile',
     label: 'Who Can enter?',
-    text: `Repco Rewards members who are Australian residents aged 16 years or older who comply with these Terms and Conditions.
+    text: `Open to Repco Auto Parts and Capricorn Trade Account Customers who are operating within Australia and if an individual and are aged 18 years or older.
+
+Eligible Businesses must be within the Promoter’s trading terms throughout the promotional period and must not have overdue monies owing as at the promotional closing date to claim any prize.  
+
 `,
   },
   {
     slug: 'ineligibile',
     label: 'Who is ineligible?',
     text: `Employees (and their immediate families) of the Promoter, participating retail stores and agencies associated with this promotion are ineligible to enter. Immediate family means any of the following: spouse, ex-spouse, de-facto spouse, child or step-child (whether natural or by adoption), parent, step-parent, grandparent, step-grandparent, uncle, aunt, niece, nephew, brother, sister, step-brother, step-sister or 1st cousin.
-Companies, businesses and organisations of any description are excluded from participating in this Promotion.`,
+
+Customers of GPC Asia Pacific Participating Businesses who are designated by GPC Asia Pacific as national company owned accounts, resellers, Repco Petrol & Convenience and Government account customer; GPC Asia Pacific employees, contractors, or suppliers; agencies associated with this promotion; Customers of GPC Asia Pacific Participating Businesses who have policies prohibiting the receipt of gifts or commercial prizes.
+`,
   },
   {
     slug: 'regions',
@@ -49,19 +54,18 @@ Companies, businesses and organisations of any description are excluded from par
   {
     slug: 'how_to_enter',
     label: 'How to Enter',
-    text: `Entrants will receive one (1) entry into the draw for every $[[SPEND]] (incl. GST) spent on [[BRAND]] products in a single transaction, provided they present their Repco Rewards membership at the time of purchase in-store or complete the purchase online at repco.com.au using a valid Repco Rewards membership.
+    text: `The first [[MANY]] accounts that spend over $[[SPEND]] (excluding GST) on [[BRAND]] products during the promotional period are eligible to redeem one gift.
 
-Customers who are not Repco Rewards members may join the Repco Rewards program free of charge in-store or online at repco.com.au prior to making a qualifying purchase.
-Persons aged less than 18 years must have consent from a Parent or Guardian to register for Repco Rewards.
-The Promoter reserves the right to verify the validity of entries and to disqualify any entry that does not comply with these Terms and Conditions.
-All entries to this promotion are based on Repco’s internal business systems. 
+Labour, engines, freight charges, membership fees and core deposits are excluded from this promotion.
 
-
+This offer will not be extended
 
 `,
     gaps: [
+       { key: 'MANY', question: 'Number of items available?', placeholder: 'e.g. 250' },
       { key: 'SPEND', question: 'Qualifying spend amount (per entry)?', placeholder: 'e.g. 50' },
       { key: 'BRAND', question: 'Participating Brand(s) or descriptions?', placeholder: 'e.g. Brand or Brands' },
+
     ],
   },
   {

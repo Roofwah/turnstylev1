@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { calculateQuote, calcDrawFee } from '@/lib/quote-engine'
 import { createCampaign, createDrawOnlyCampaign } from '@/app/actions/campaigns'
@@ -9,6 +9,7 @@ import { searchPromoters, type PromoterRecord } from '@/lib/promoter-lookup'
 import MechanicWizardModal, { type MechanicDetails } from '@/components/MechanicWizardModal'
 import PrizeWizardModal from '@/components/PrizeWizardModal'
 import DrawWizardModal from '@/components/DrawWizardModal'
+import { loadIntakePrefill, clearIntakePrefill } from '@/lib/intake/storage'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PrizeTier {
@@ -198,14 +199,16 @@ function DrawOnlyModal({ onConfirm, onCancel }: { onConfirm: () => void; onCance
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function BuildFormPage() {
+function BuildFormPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [step, setStep] = useState(1)
   const [saving, setSaving] = useState(false)
   const [showDrawOnlyModal, setShowDrawOnlyModal] = useState(false)
   const [isDrawOnly, setIsDrawOnly] = useState(false)
   const [promoterSuggestions, setPromoterSuggestions] = useState<PromoterRecord[]>([])
   const [promoterLocked, setPromoterLocked] = useState(false)
+  const [intakeLoaded, setIntakeLoaded] = useState(false)
 
   const [form, setForm] = useState<FormData>({
     promoterName: '', promoterAbn: '', promoterAddress: '', contactName: '', contactEmail: '',
@@ -234,6 +237,51 @@ export default function BuildFormPage() {
     campaignName: '', drawDate: '', drawTime: '',
     prizes: [{ ...EMPTY_PRIZE, tier: '1st' }],
   })
+
+  // Hydrate from campaign intake prefill (sessionStorage)
+  useEffect(() => {
+    if (searchParams.get('from') !== 'intake') return
+    const prefill = loadIntakePrefill()
+    if (!prefill) return
+
+    setForm(prev => ({
+      ...prev,
+      promoterName: prefill.promoterName || prev.promoterName,
+      campaignName: prefill.campaignName || prev.campaignName,
+      tsCode: prefill.campaignName ? generateTsCode(prefill.campaignName) : prev.tsCode,
+      promoStart: prefill.promoStart || prev.promoStart,
+      promoEnd: prefill.promoEnd || prev.promoEnd,
+      drawMechanic: prefill.drawMechanic || prev.drawMechanic,
+      drawFrequency: prefill.drawFrequency || prev.drawFrequency,
+      entryMechanic: prefill.entryMechanic || prev.entryMechanic,
+      regions: prefill.regions.length ? prefill.regions : prev.regions,
+      prizes: prefill.prizes.length ? prefill.prizes : prev.prizes,
+      notes: prefill.notes || prev.notes,
+    }))
+
+    if (prefill.mechanicDetails) {
+      setMechanicDetails({
+        entryMechanic: prefill.entryMechanic,
+        purchaseValue: prefill.mechanicDetails.purchaseValue,
+        gstType: prefill.mechanicDetails.gstType,
+        participatingBrand: prefill.mechanicDetails.participatingBrand,
+        website: prefill.mechanicDetails.website,
+        additionalEntryValue: prefill.mechanicDetails.additionalEntryValue,
+        additionalEntryGst: prefill.mechanicDetails.additionalEntryGst,
+      })
+    }
+
+    if (prefill.prizes.length > 0) {
+      setConfirmedPrizes(prefill.prizes)
+      setPrizesConfirmed(true)
+      const pool = prefill.prizes.reduce((s, p) => s + p.qty * p.unitValue, 0)
+      setPrizePoolTotal(pool)
+    }
+
+    if (prefill.promoterName) setPromoterLocked(true)
+    setIntakeLoaded(true)
+    clearIntakePrefill()
+  }, [searchParams])
 
   function set<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -451,6 +499,14 @@ export default function BuildFormPage() {
           </div>
         </div>
       </nav>
+
+      {intakeLoaded && (
+        <div className="max-w-2xl mx-auto px-6 pt-4">
+          <div className="bg-emerald-400/10 border border-emerald-400/25 rounded-xl px-4 py-3 text-emerald-400 text-sm">
+            Prefilled from Campaign Intake — review and edit fields before saving.
+          </div>
+        </div>
+      )}
 
       <main className="max-w-2xl mx-auto px-6 py-10">
 
@@ -985,5 +1041,17 @@ export default function BuildFormPage() {
       )}
 
     </div>
+  )
+}
+
+export default function BuildFormPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
+        <p className="text-white/40 text-sm">Loading…</p>
+      </div>
+    }>
+      <BuildFormPageInner />
+    </Suspense>
   )
 }

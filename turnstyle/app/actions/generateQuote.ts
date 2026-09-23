@@ -14,8 +14,11 @@ export async function generateQuote(campaignId: string) {
 
   const prizes = Array.isArray(raw.prizes) ? raw.prizes as any[] : []
 
-  const drawMechanic = raw.mechanicType === 'SWEEPSTAKES'   ? 'Sweepstakes - Random Draw'
+  const drawMechanic = raw.mechanicType === 'SWEEPSTAKES'   ? 'Sweepstakes'
+                     : raw.mechanicType === 'INSTANT_WIN'   ? 'Instant Win'
                      : raw.mechanicType === 'LIMITED_OFFER' ? 'Limited Offer'
+                     : raw.mechanicType === 'GAME_OF_SKILL' ? 'Game of Skill'
+                     : raw.mechanicType === 'DRAW_ONLY'     ? 'Draw Only'
                      : 'Other'
 
   const drawFrequency = (raw.drawFrequency ?? 'AT_CONCLUSION').toLowerCase().replace('at_conclusion', 'at_conclusion')
