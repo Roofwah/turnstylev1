@@ -28,14 +28,31 @@ function asBool(v: unknown): boolean | null {
   return null
 }
 
+const MONTHS: Record<string, number> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3,
+  apr: 4, april: 4, may: 5, jun: 6, june: 6, jul: 7, july: 7,
+  aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+}
+
 function normalizeIsoDate(v: unknown): string | null {
   const s = asString(v)
   if (!s) return null
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-  const dmy = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
   if (dmy) {
     const [, d, mo, y] = dmy
     return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+  }
+  const mdY = s.match(/^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i)
+  if (mdY) {
+    const mo = MONTHS[mdY[1].toLowerCase()]
+    if (mo) return `${mdY[3]}-${String(mo).padStart(2, '0')}-${mdY[2].padStart(2, '0')}`
+  }
+  const dMY = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+(\d{4})$/i)
+  if (dMY) {
+    const mo = MONTHS[dMY[2].toLowerCase()]
+    if (mo) return `${dMY[3]}-${String(mo).padStart(2, '0')}-${dMY[1].padStart(2, '0')}`
   }
   return null
 }

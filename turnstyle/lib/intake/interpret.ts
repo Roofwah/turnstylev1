@@ -5,8 +5,20 @@ import { mockExtractCampaign } from './mock'
 const INTAKE_SYSTEM = `You are a campaign intake assistant for Turnstyle, an Australian trade promotions platform.
 Extract structured campaign data from messy pasted emails, briefs, or notes.
 Return ONLY valid JSON matching the schema. Use ISO dates (YYYY-MM-DD).
-Split AU and NZ into separate region objects when both appear with different prize pools.
-Set loyalty_required true when Repco Rewards or similar loyalty wording appears.
+
+Date rules:
+- Parse any common format: DD/MM/YYYY, Month Day-Day Year (e.g. November 23-30, 2026), Day-Day Month Year, ISO.
+- Map to start_date and end_date per region.
+
+Prize rules:
+- Capture prize description text (including product names after "Win 1 of N -").
+- Capture quantity from "N of M", "N x", or "Win a/an".
+- Capture unit_value from "$X", "$X each", or a nearby "Prize value:" / "Value:" line.
+- Set total_value = quantity × unit_value when both are known.
+- Ignore minor prizes marked n/a / none / nil.
+
+Split AU and NZ into separate region objects when both appear.
+Set loyalty_required true when Rewards / loyalty membership wording appears.
 Infer campaign_name from context when not explicit.`
 
 /**

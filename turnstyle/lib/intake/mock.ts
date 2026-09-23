@@ -13,91 +13,361 @@ function isRepcoFiltrationSample(text: string): boolean {
   return REPCO_SAMPLE_MARKERS.every(m => lower.includes(m))
 }
 
-function parseDateDMY(s: string): string | null {
-  const m = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/)
-  if (!m) return null
-  const [, d, mo, y] = m
-  return `${y}-${mo.padStart(2, '0')}-${d.padStart(2, '0')}`
+const MONTHS: Record<string, number> = {
+  jan: 1, january: 1,
+  feb: 2, february: 2,
+  mar: 3, march: 3,
+  apr: 4, april: 4,
+  may: 5,
+  jun: 6, june: 6,
+  jul: 7, july: 7,
+  aug: 8, august: 8,
+  sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10,
+  nov: 11, november: 11,
+  dec: 12, december: 12,
 }
 
-function parsePrizeLine(line: string): { qty: number; unit: number; desc: string } | null {
-  const m = line.match(/(\d+)\s*x\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(.+)/i)
-  if (!m) return null
-  return {
-    qty: parseInt(m[1], 10),
-    unit: parseFloat(m[2].replace(/,/g, '')),
-    desc: m[3].trim(),
-  }
+function pad2(n: number): string {
+  return String(n).padStart(2, '0')
 }
 
-function prizeFromLine(line: string, type: 'major' | 'minor'): ExtractedPrize | null {
-  const p = parsePrizeLine(line)
-  if (!p) return null
-  return {
-    type,
-    description: p.desc,
-    quantity: p.qty,
-    unit_value: p.unit,
-    total_value: p.qty * p.unit,
+function toIso(year: number, month: number, day: number): string | null {
+  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) return null
+  const d = new Date(Date.UTC(year, month - 1, day))
+  if (d.getUTCFullYear() !== year || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return null
+  return `${year}-${pad2(month)}-${pad2(day)}`
+}
+
+/** Parse a single date fragment into YYYY-MM-DD */
+function parseSingleDate(raw: string, fallbackYear?: number): string | null {
+  const s = raw.trim()
+  if (!s) return null
+
+  // ISO
+  const iso = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+  if (iso) return toIso(+iso[1], +iso[2], +iso[3])
+
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
+  if (dmy) return toIso(+dmy[3], +dmy[2], +dmy[1])
+
+  // Month Day, Year  |  Month Day Year
+  const mdY = s.match(/^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i)
+  if (mdY) {
+    const mo = MONTHS[mdY[1].toLowerCase()]
+    if (mo) return toIso(+mdY[3], mo, +mdY[2])
   }
+
+  // Day Month Year
+  const dMY = s.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+(\d{4})$/i)
+  if (dMY) {
+    const mo = MONTHS[dMY[2].toLowerCase()]
+    if (mo) return toIso(+dMY[3], mo, +dMY[1])
+  }
+
+  // Month Day (year from context)
+  if (fallbackYear) {
+    const md = s.match(/^([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?$/i)
+    if (md) {
+      const mo = MONTHS[md[1].toLowerCase()]
+      if (mo) return toIso(fallbackYear, mo, +md[2])
+    }
+    const dOnly = s.match(/^(\d{1,2})(?:st|nd|rd|th)?$/)
+    if (dOnly) return null // need month — handled in range parser
+  }
+
+  return null
+}
+
+/**
+ * Extract start/end dates from free text.
+ * Handles ranges like:
+ * - 01/11/2026 – 30/11/2026
+ * - November 23-30, 2026
+ * - 23–30 November 2026
+ * - November 23 to November 30, 2026
+ * - Dates: 23 Nov 2026 - 30 Nov 2026
+ */
+function parseDateRange(text: string): { start: string | null; end: string | null } {
+  // Prefer an explicit Dates: line when present
+  const datesLine = text.match(/dates?\s*[:\-]\s*([^\n]+)/i)
+  const scope = datesLine?.[1] ?? text
+
+  // Numeric range DD/MM/YYYY – DD/MM/YYYY
+  const numRange = scope.match(
+    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\s*(?:[–—\-]|to)\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i
+  )
+  if (numRange) {
+    return { start: parseSingleDate(numRange[1]), end: parseSingleDate(numRange[2]) }
+  }
+
+  // ISO range
+  const isoRange = scope.match(/(\d{4}-\d{2}-\d{2})\s*(?:[–—\-]|to)\s*(\d{4}-\d{2}-\d{2})/)
+  if (isoRange) {
+    return { start: parseSingleDate(isoRange[1]), end: parseSingleDate(isoRange[2]) }
+  }
+
+  // Month Day-Day, Year  e.g. November 23-30, 2026  /  Nov 23 – 30 2026
+  const sameMonth = scope.match(
+    /\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s*[–—\-]\s*(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i
+  )
+  if (sameMonth) {
+    const mo = MONTHS[sameMonth[1].toLowerCase()]
+    if (mo) {
+      return {
+        start: toIso(+sameMonth[4], mo, +sameMonth[2]),
+        end: toIso(+sameMonth[4], mo, +sameMonth[3]),
+      }
+    }
+  }
+
+  // Day-Day Month Year  e.g. 23-30 November 2026
+  const dayDayMonth = scope.match(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s*[–—\-]\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+),?\s+(\d{4})\b/i
+  )
+  if (dayDayMonth) {
+    const mo = MONTHS[dayDayMonth[3].toLowerCase()]
+    if (mo) {
+      return {
+        start: toIso(+dayDayMonth[4], mo, +dayDayMonth[1]),
+        end: toIso(+dayDayMonth[4], mo, +dayDayMonth[2]),
+      }
+    }
+  }
+
+  // Month Day to Month Day, Year  e.g. November 23 to December 5, 2026
+  const crossMonth = scope.match(
+    /\b([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(?:to|[–—\-])\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b/i
+  )
+  if (crossMonth) {
+    const mo1 = MONTHS[crossMonth[1].toLowerCase()]
+    const mo2 = MONTHS[crossMonth[3].toLowerCase()]
+    if (mo1 && mo2) {
+      return {
+        start: toIso(+crossMonth[5], mo1, +crossMonth[2]),
+        end: toIso(+crossMonth[5], mo2, +crossMonth[4]),
+      }
+    }
+  }
+
+  // Two full dates with month names
+  const twoFull = scope.match(
+    /\b([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\s*(?:[–—\-]|to)\s*([A-Za-z]+\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4})\b/i
+  )
+  if (twoFull) {
+    return { start: parseSingleDate(twoFull[1]), end: parseSingleDate(twoFull[2]) }
+  }
+
+  // Fallback: first two distinct parseable dates in scope
+  const candidates: string[] = []
+  const patterns = [
+    /\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}\b/g,
+    /\b\d{4}-\d{2}-\d{2}\b/g,
+    /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi,
+    /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?),?\s+\d{4}\b/gi,
+  ]
+  for (const re of patterns) {
+    const matches = scope.match(re) ?? []
+    for (const m of matches) {
+      const parsed = parseSingleDate(m)
+      if (parsed && !candidates.includes(parsed)) candidates.push(parsed)
+    }
+  }
+  if (candidates.length >= 2) return { start: candidates[0], end: candidates[1] }
+  if (candidates.length === 1) return { start: candidates[0], end: candidates[0] }
+
+  return { start: null, end: null }
+}
+
+function parseMoney(raw: string): number | null {
+  // Require $ so model numbers like Q1200N are not treated as money
+  const m = raw.replace(/,/g, '').match(/\$\s*([\d]+(?:\.\d{1,2})?)/)
+  if (!m) return null
+  return parseFloat(m[1])
+}
+
+function cleanPrizeDescription(desc: string): string {
+  return desc
+    .replace(/^win\s+/i, '')
+    .replace(/^\d+\s+of\s+\d+\s*[-–—:]\s*/i, '')
+    .replace(/^[:\-–—]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.\s]+$/, '')
+    .trim()
+}
+
+function isNaPrize(text: string): boolean {
+  return /^(n\/?a|nil|none|not\s+applicable|-|—)$/i.test(text.trim())
+}
+
+/**
+ * Parse quantity + description from common prize phrasings:
+ * - 10 x $4000 Flight Centre Gift Card
+ * - Win 1 of 1 - Weber Baby Q
+ * - 1× Weber BBQ
+ * - Major Prize: Flight Centre Gift Card
+ */
+function parsePrizeDescription(line: string): { qty: number; desc: string; unitFromLine: number | null } | null {
+  const trimmed = line.trim()
+  if (!trimmed || isNaPrize(trimmed)) return null
+
+  // Nx $value description
+  const nxValue = trimmed.match(/^(\d+)\s*[x×]\s*\$?\s*([\d,]+(?:\.\d+)?)\s+(.+)$/i)
+  if (nxValue) {
+    return {
+      qty: parseInt(nxValue[1], 10),
+      unitFromLine: parseFloat(nxValue[2].replace(/,/g, '')),
+      desc: cleanPrizeDescription(nxValue[3]),
+    }
+  }
+
+  // Win N of M - description  /  N of M - description
+  const winOf = trimmed.match(/^(?:win\s+)?(\d+)\s+of\s+(\d+)\s*[-–—:]\s*(.+)$/i)
+  if (winOf) {
+    return {
+      qty: parseInt(winOf[1], 10),
+      unitFromLine: null,
+      desc: cleanPrizeDescription(winOf[3]),
+    }
+  }
+
+  // N x description (no dollar on same line)
+  const nxDesc = trimmed.match(/^(\d+)\s*[x×]\s+(.+)$/i)
+  if (nxDesc) {
+    return {
+      qty: parseInt(nxDesc[1], 10),
+      unitFromLine: null,
+      desc: cleanPrizeDescription(nxDesc[2]),
+    }
+  }
+
+  // Leading "Win a/an/the ..."
+  const winA = trimmed.match(/^win\s+(?:a|an|the)\s+(.+)$/i)
+  if (winA) {
+    return { qty: 1, unitFromLine: null, desc: cleanPrizeDescription(winA[1]) }
+  }
+
+  return { qty: 1, unitFromLine: null, desc: cleanPrizeDescription(trimmed) }
+}
+
+function extractPrizeValueFromBlock(block: string, afterIndex?: number): number | null {
+  const searchIn = afterIndex != null ? block.slice(afterIndex) : block
+
+  // Prize value: $399 each / Unit value: $399 / Value: $399
+  const labelled = searchIn.match(
+    /(?:prize\s+value|unit\s+value|rrp|value)\s*[:\-]\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(?:each|ea\.?)?/i
+  )
+  if (labelled) return parseFloat(labelled[1].replace(/,/g, ''))
+
+  // $399 each on its own nearby line
+  const each = searchIn.match(/\$\s*([\d,]+(?:\.\d+)?)\s*(?:each|ea\.?)\b/i)
+  if (each) return parseFloat(each[1].replace(/,/g, ''))
+
+  return null
+}
+
+function extractPrizesFromBlock(block: string): ExtractedPrize[] {
+  const prizes: ExtractedPrize[] = []
+  const lines = block.split(/\n/)
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    const major = line.match(/^\s*major\s+prizes?\s*[:\-]\s*(.+)$/i)
+    const minor = line.match(/^\s*minor\s+prizes?\s*[:\-]\s*(.+)$/i)
+    const generic = line.match(/^\s*prizes?\s*[:\-]\s*(.+)$/i)
+
+    const match = major ?? minor ?? generic
+    if (!match) continue
+
+    const type: 'major' | 'minor' = minor ? 'minor' : 'major'
+    const rest = match[1].trim()
+    if (isNaPrize(rest)) continue
+
+    const parsed = parsePrizeDescription(rest)
+    if (!parsed || !parsed.desc) continue
+
+    // Value may be on this line or following lines
+    let unit = parsed.unitFromLine
+    if (unit == null) unit = parseMoney(rest)
+    if (unit == null) {
+      const lookahead = lines.slice(i, i + 5).join('\n')
+      unit = extractPrizeValueFromBlock(lookahead)
+    }
+    if (unit == null) {
+      unit = extractPrizeValueFromBlock(block)
+    }
+
+    prizes.push({
+      type,
+      description: parsed.desc,
+      quantity: parsed.qty,
+      unit_value: unit,
+      total_value: unit != null ? parsed.qty * unit : null,
+    })
+  }
+
+  // Also catch "Total prize value AU $40,000" style without itemised prizes
+  return prizes
 }
 
 function parseRegionBlock(block: string, regionName: string): Partial<ExtractedRegion> {
   const lower = block.toLowerCase()
-  const dateRange = block.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\s*[–\-—to]+\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i)
-  const start = dateRange ? parseDateDMY(dateRange[1]) : null
-  const end = dateRange ? parseDateDMY(dateRange[2]) : null
+  const { start, end } = parseDateRange(block)
 
   let threshold: number | null = null
-  const spend = block.match(/\$\s*(\d+(?:\.\d+)?)\s*or more/i)
-  if (spend) threshold = parseFloat(spend[1])
+  const spend =
+    block.match(/spend\s+\$?\s*([\d,]+(?:\.\d+)?)\s*(?:or more|plus|\+)/i) ??
+    block.match(/\$\s*([\d,]+(?:\.\d+)?)\s*or more/i) ??
+    block.match(/(?:every|per)\s+\$?\s*([\d,]+(?:\.\d+)?)\s*(?:spent|spend)/i)
+  if (spend) threshold = parseFloat(spend[1].replace(/,/g, ''))
 
-  const loyalty = /rewards only|loyalty|members only|member(s)? only/i.test(block)
-  const subsequent = /subsequent entries:\s*yes/i.test(lower)
+  const loyalty = /rewards|loyalty|members?\s+only|be\s+a\s+\w+\s+rewards?\s+member/i.test(block)
+  const subsequent =
+    /subsequent\s+entr(?:y|ies)\s*:\s*yes/i.test(lower) ||
+    /(?:1|one)\s+entr(?:y|ies)\s+for\s+every/i.test(lower) ||
+    /additional\s+entr(?:y|ies)/i.test(lower)
 
   const brands: string[] = []
-  const brandLine = block.match(/participating brands?[\/\s]*suppliers?[:\s]+([^\n]+)/i)
+  const brandLine = block.match(/participating\s+brands?[\/\s]*suppliers?\s*[:\-]\s*([^\n]+)/i)
   if (brandLine) {
     brandLine[1].split(/[,;&]/).forEach(b => {
       const t = b.trim()
-      if (t) brands.push(t)
+      if (t && !isNaPrize(t)) brands.push(t)
     })
   }
 
-  const prizes: ExtractedPrize[] = []
-  const majorLine = block.match(/major prize[:\s]+([^\n]+)/i)
-  if (majorLine) {
-    const p = prizeFromLine(majorLine[1], 'major')
-    if (p) prizes.push(p)
-  }
+  const prizes = extractPrizesFromBlock(block)
 
   let totalPool: number | null = null
-  const poolLine = block.match(/total prize value[^0-9]*([\d,]+)\s*k?/i)
+  const poolLine = block.match(/total\s+prize\s+value[^0-9$]*\$?\s*([\d,]+(?:\.\d+)?)\s*(k)?/i)
   if (poolLine) {
-    const raw = poolLine[1].replace(/,/g, '')
-    totalPool = parseFloat(raw)
-    if (/k/i.test(poolLine[0]) && totalPool < 1000) totalPool *= 1000
+    totalPool = parseFloat(poolLine[1].replace(/,/g, ''))
+    if (poolLine[2] && totalPool < 1000) totalPool *= 1000
   }
   if (totalPool == null && prizes.length) {
-    totalPool = prizes.reduce((s, p) => s + (p.total_value ?? 0), 0)
+    const sum = prizes.reduce((s, p) => s + (p.total_value ?? 0), 0)
+    if (sum > 0) totalPool = sum
   }
 
-  const entryLine = block.match(/entry mechanics?[:\s]+([^\n]+)/i)
+  const entryLine = block.match(/entry\s+mechanics?\s*[:\-]\s*([^\n]+)/i)
 
   return {
     region_name: regionName,
     country: regionName === 'AU' ? 'Australia' : regionName === 'NZ' ? 'New Zealand' : null,
     start_date: start,
     end_date: end,
-    entry_mechanic: entryLine?.[1]?.trim() ?? (threshold ? `Spend $${threshold} or more in a single transaction` : null),
+    entry_mechanic:
+      entryLine?.[1]?.trim() ??
+      (threshold ? `Spend $${threshold} or more in a single transaction` : null),
     entry_threshold: threshold,
-    purchase_requirement: 'single transaction',
+    purchase_requirement: /single\s+transaction/i.test(block) ? 'single transaction' : null,
     loyalty_required: regionName === 'AU' ? loyalty : null,
     participating_brands: brands,
     subsequent_entries_allowed: subsequent,
     prizes,
     major_prizes: prizes.filter(p => p.type === 'major'),
-    minor_prizes: [],
+    minor_prizes: prizes.filter(p => p.type === 'minor'),
     draw_type: 'random_draw',
     draw_frequency: null,
     draw_date: null,
@@ -108,9 +378,9 @@ function parseRegionBlock(block: string, regionName: string): Partial<ExtractedR
 }
 
 function splitAuNzBlocks(raw: string): { au: string; nz: string } {
-  const nzIdx = raw.search(/\bNZ\b/i)
+  const nzIdx = raw.search(/(?:^|\n)\s*NZ\b/i)
   if (nzIdx === -1) return { au: raw, nz: '' }
-  const auIdx = raw.search(/\bAU\b/i)
+  const auIdx = raw.search(/(?:^|\n)\s*AU\b/i)
   const auStart = auIdx >= 0 ? auIdx : 0
   return {
     au: raw.slice(auStart, nzIdx),
@@ -197,15 +467,19 @@ function repcoFiltrationExtraction(raw: string): ExtractedCampaignIntake {
   return intake
 }
 
+function inferCampaignName(raw: string, brands: string[]): string | null {
+  if (/filtration/i.test(raw)) return 'Repco Filtration Competition'
+  if (/black\s*friday/i.test(raw) && brands.length) {
+    return `${brands[0]} Black Friday`
+  }
+  if (/black\s*friday/i.test(raw) && /repco/i.test(raw)) return 'Repco Black Friday'
+  const nameMatch = raw.match(/(?:running a|campaign(?:\s+name)?|promotion(?:\s+name)?)\s*[:\-]\s*([^\n.]+)/i)
+  if (nameMatch) return nameMatch[1].trim()
+  return null
+}
+
 function heuristicExtract(raw: string): ExtractedCampaignIntake {
   const assumptions: string[] = ['Heuristic extraction used — review all fields carefully.']
-
-  let campaignName: string | null = null
-  if (/filtration/i.test(raw)) campaignName = 'Repco Filtration Competition'
-  else {
-    const nameMatch = raw.match(/(?:running a|campaign)[:\s]+([^\n.]+)/i)
-    if (nameMatch) campaignName = nameMatch[1].trim()
-  }
 
   let retailer: string | null = null
   if (/repco/i.test(raw)) retailer = 'Repco'
@@ -231,7 +505,7 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
       subsequent_entries_allowed: partial.subsequent_entries_allowed ?? null,
       prizes: partial.prizes ?? [],
       major_prizes: partial.major_prizes ?? [],
-      minor_prizes: [],
+      minor_prizes: partial.minor_prizes ?? [],
       draw_type: 'random_draw',
       draw_frequency: null,
       draw_date: null,
@@ -257,7 +531,7 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
       subsequent_entries_allowed: partial.subsequent_entries_allowed ?? null,
       prizes: partial.prizes ?? [],
       major_prizes: partial.major_prizes ?? [],
-      minor_prizes: [],
+      minor_prizes: partial.minor_prizes ?? [],
       draw_type: 'random_draw',
       draw_frequency: null,
       draw_date: null,
@@ -266,9 +540,12 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
       permit_flags: ['NONE_REQUIRED'],
     })
     if (regions.length > 1) {
-      assumptions.push('AU and NZ split into separate region sections due to different prize pools.')
+      assumptions.push('AU and NZ split into separate region sections.')
     }
   }
+
+  const allBrands = regions.flatMap(r => r.participating_brands)
+  const campaignName = inferCampaignName(raw, allBrands)
 
   const intake: ExtractedCampaignIntake = {
     raw_input: raw,
@@ -283,6 +560,12 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
     confidence_scores: {
       campaign_name: campaignName ? 0.65 : 0.25,
       promoter_name: retailer ? 0.75 : 0.25,
+      ...Object.fromEntries(
+        regions.flatMap(r => [
+          [`${r.region_name}.dates`, r.start_date && r.end_date ? 0.9 : 0.3],
+          [`${r.region_name}.prizes`, r.prizes.length ? 0.85 : 0.2],
+        ])
+      ),
     },
     generated_summary: '',
   }
@@ -311,3 +594,6 @@ export function mockExtractCampaign(raw: string): ExtractedCampaignIntake {
   if (isRepcoFiltrationSample(trimmed)) return repcoFiltrationExtraction(trimmed)
   return heuristicExtract(trimmed)
 }
+
+/** Exported for tests / reuse */
+export { parseDateRange, parsePrizeDescription, extractPrizesFromBlock }
