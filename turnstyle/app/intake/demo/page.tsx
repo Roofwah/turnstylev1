@@ -141,7 +141,7 @@ export default function IntakeDemoPage() {
         ) : (
           <div className="space-y-6">
             <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-200/90">
-              Your promotional brief has been received by Flow Marketing.
+              Thanks — your Campaign Packet is ready.
               {result?.emails?.submitter
                 ? ' A copy has been sent to your email address.'
                 : ' We could not confirm email delivery — your packet was still saved.'}
@@ -202,7 +202,7 @@ export default function IntakeDemoPage() {
         )}
 
         <p className="mt-16 text-center text-[11px] text-white/25">
-          Flow Marketing · Turnstyle Intake demonstration
+          Zitcha · Sales promotions by Turnstyle
         </p>
       </div>
     </div>

@@ -174,7 +174,7 @@ export async function processIntakePacket(input: PacketSubmitInput): Promise<Pro
     flowSent: false,
   }
 
-  const submitterResult = await sendPacketSubmitterEmail(presentation)
+  const submitterResult = await sendPacketSubmitterEmail(presentation, intake)
   emails.submitterSent = submitterResult.ok
   if (!submitterResult.ok) emails.submitterError = submitterResult.error
 

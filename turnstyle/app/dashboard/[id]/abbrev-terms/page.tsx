@@ -3,30 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { getCampaign } from '@/app/actions/getCampaign'
-
-const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'ACT', 'TAS', 'NT']
-
-function formatDateLong(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('en-AU', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
-  })
-}
-
-function formatMoney(n: number) {
-  return '$' + Number(n).toLocaleString('en-AU', { minimumFractionDigits: 2 })
-}
-
-function formatRegions(regions: string[]) {
-  if (regions.includes('national_au')) return 'Australia'
-  const states = regions.filter(r => AU_STATES.includes(r))
-  const parts: string[] = []
-  if (states.length) parts.push(states.join(', '))
-  if (regions.includes('NZ'))  parts.push('New Zealand')
-  if (regions.includes('USA')) parts.push('United States')
-  if (regions.includes('EU'))  parts.push('Europe')
-  return parts.join(', ') || '—'
-}
+import { generateAbbreviatedTerms } from '@/lib/abbrev-terms/generate'
 
 function normaliseCampaign(raw: any) {
   return {
@@ -45,51 +22,6 @@ function normaliseCampaign(raw: any) {
     prizes:        Array.isArray(raw.prizes) ? raw.prizes : [],
     notes:         raw.notes ?? '',
   }
-}
-
-function generateDrawDateText(promoEnd: string, drawFrequency: string): string {
-  if (!promoEnd) return 'TBC'
-  const end = new Date(promoEnd)
-
-  if (drawFrequency === 'at_conclusion') {
-    // Draw 5 business days after promo end
-    const draw = new Date(end)
-    let added = 0
-    while (added < 5) {
-      draw.setDate(draw.getDate() + 1)
-      if (draw.getDay() !== 0 && draw.getDay() !== 6) added++
-    }
-    return draw.toLocaleDateString('en-AU', {
-      hour: '2-digit', minute: '2-digit', weekday: 'long',
-      day: 'numeric', month: 'long', year: 'numeric'
-    })
-  }
-  return 'as per schedule'
-}
-
-function generateAbbreviatedTerms(campaign: any, campaignUrl: string): string {
-  const prizePoolTotal = campaign.prizes.reduce((s: number, p: any) => s + p.qty * p.unitValue, 0)
-  const isLimitedOffer = campaign.drawMechanic === 'Limited Offer'
-  const regions = formatRegions(campaign.regions)
-  const drawDate = generateDrawDateText(campaign.promoEnd, campaign.drawFrequency)
-
-  // Build prize description
-  const prizeDesc = campaign.prizes.map((p: any) =>
-    `${p.qty === 1 ? '' : `${p.qty} x `}${p.description} valued at ${formatMoney(p.unitValue)} incl GST`
-  ).join(', ')
-
-  // Entry mechanic
-  const entry = campaign.entryMechanic || '[entry mechanic to be confirmed]'
-
-  // Promoter
-  const promoterName = campaign.promoter?.name || '[Promoter]'
-
-  // Build the paragraph
-  if (isLimitedOffer) {
-    return `Commences 12:00am ${formatDateLong(campaign.promoStart)} and ends 11:59pm ${formatDateLong(campaign.promoEnd)} AEST, see website via the attached QR Code for full terms and conditions, entry requirements, participating retailers and prize details. Please review to determine whether you are eligible to participate. ${entry}. ${prizeDesc}. Total prize pool in ${regions} is ${formatMoney(prizePoolTotal)} incl GST. Promoter is ${promoterName}.`
-  }
-
-  return `Commences 12:00am ${formatDateLong(campaign.promoStart)} and ends 11:59pm ${formatDateLong(campaign.promoEnd)} AEST, see website via the attached QR Code for full terms and conditions, entry requirements, participating retailers, prize details and State permit numbers where applicable. Please review to determine whether you are eligible to participate. ${entry}. ${prizeDesc}. Prize drawn ${drawDate} at Flow Marketing, 11 Lomandra Pl, Coolum Beach QLD 4573, Australia. Winners notified via the website or the QR code. Total prize pool in ${regions} is ${formatMoney(prizePoolTotal)} incl GST. Promoter is ${promoterName}.`
 }
 
 export default function AbbrevTermsPage() {
@@ -114,7 +46,20 @@ export default function AbbrevTermsPage() {
 
   const campaignUrl = `https://turnstylehost.com/campaign/${campaign.tsCode.toLowerCase()}/`
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(campaignUrl)}`
-  const terms = generateAbbreviatedTerms(campaign, campaignUrl)
+  const terms = generateAbbreviatedTerms({
+    promoStart: campaign.promoStart || null,
+    promoEnd: campaign.promoEnd || null,
+    drawMechanic: campaign.drawMechanic,
+    drawFrequency: campaign.drawFrequency,
+    entryMechanic: campaign.entryMechanic || null,
+    regions: campaign.regions,
+    prizes: campaign.prizes.map((p: { description: string; qty: number; unitValue: number }) => ({
+      description: p.description,
+      qty: p.qty,
+      unitValue: p.unitValue ?? null,
+    })),
+    promoterName: campaign.promoter?.name || null,
+  })
   const now = new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
 
   return (
