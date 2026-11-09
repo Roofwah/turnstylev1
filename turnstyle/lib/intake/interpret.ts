@@ -3,23 +3,48 @@ import { finalizeMockIntake } from './normalize'
 import { mockExtractCampaign } from './mock'
 
 const INTAKE_SYSTEM = `You are a campaign intake assistant for Turnstyle, an Australian trade promotions platform.
-Extract structured campaign data from messy pasted emails, briefs, or notes.
-Return ONLY valid JSON matching the schema. Use ISO dates (YYYY-MM-DD).
+Extract structured campaign data from short promotional concepts, emails, or briefs.
+Return ONLY valid JSON matching this shape:
+{
+  "campaign_name": string|null,
+  "promoter_name": string|null,
+  "brand": string|null,
+  "retailer": string|null,
+  "notes": string|null,
+  "assumptions": string[],
+  "regions": [{
+    "region_name": "AU"|"NZ"|string,
+    "country": string|null,
+    "start_date": "YYYY-MM-DD"|null,
+    "end_date": "YYYY-MM-DD"|null,
+    "entry_mechanic": string|null,
+    "entry_threshold": number|null,
+    "purchase_requirement": string|null,
+    "loyalty_required": boolean|null,
+    "participating_brands": string[],
+    "subsequent_entries_allowed": boolean|null,
+    "prizes": [{"type":"major"|"minor","description":string,"quantity":number|null,"unit_value":number|null,"total_value":number|null}],
+    "major_prizes": [],
+    "minor_prizes": [],
+    "draw_type": string|null,
+    "draw_frequency": string|null,
+    "draw_date": null,
+    "winner_publication_date": null,
+    "total_prize_value": number|null,
+    "permit_flags": []
+  }],
+  "confidence_scores": {}
+}
 
-Date rules:
-- Parse any common format: DD/MM/YYYY, Month Day-Day Year (e.g. November 23-30, 2026), Day-Day Month Year, ISO.
-- Map to start_date and end_date per region.
-
-Prize rules:
-- Capture prize description text (including product names after "Win 1 of N -").
-- Capture quantity from "N of M", "N x", or "Win a/an".
-- Capture unit_value from "$X", "$X each", or a nearby "Prize value:" / "Value:" line.
-- Set total_value = quantity × unit_value when both are known.
-- Ignore minor prizes marked n/a / none / nil.
-
-Split AU and NZ into separate region objects when both appear.
-Set loyalty_required true when Rewards / loyalty membership wording appears.
-Infer campaign_name from context when not explicit.`
+Rules:
+- Use ISO dates (YYYY-MM-DD) when dates are stated.
+- Do NOT invent missing details. Leave unknown fields null / empty.
+- Put reasonable inferences in "assumptions" (e.g. likely sweepstakes, likely digital entry) — never as confirmed facts unless the user stated them.
+- Short concepts are valid: e.g. "win purchase back across 200 stores in March" → purchase-linked consumer promotion; prize = purchase refunded; store count noted in notes/assumptions; month if year unknown leave dates null and assume month in assumptions.
+- "Chance to win a trip to Disneyland" → likely consumer sweepstakes; prize description = trip; entry method stays null unless stated.
+- Infer campaign_name from brand + prize/mechanic when helpful, mark as assumption.
+- Split AU and NZ only when both appear.
+- Prefer a single AU region when geography is unspecified (note that assumption).`
 
 /**
  * TODO: Wire Claude structured output when ANTHROPIC_API_KEY is configured server-side.

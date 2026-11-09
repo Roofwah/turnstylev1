@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "seed": "tsx prisma/seed.ts",
-    "seed:ops": "tsx prisma/seed-ops.ts"
+    "seed:ops": "tsx prisma/seed-ops.ts",
+    "test:intake": "tsx lib/intake/partner-intake.test.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

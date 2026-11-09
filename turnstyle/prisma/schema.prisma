@@ -504,19 +504,44 @@ model TermsUploadReport {
   @@map("terms_upload_reports")
 }
 
-// Campaign brief received via email (Resend Inbound) or manual paste — draft until sent to builder.
+// Campaign brief received via email (Resend Inbound), partner API, or demo — draft until sent to builder.
 model CampaignIntakeDraft {
-  id            String   @id @default(uuid())
-  reviewToken   String   @unique @map("review_token")
-  fromEmail     String?  @map("from_email")
-  subject       String?
-  resendEmailId String?  @map("resend_email_id")
-  rawInput      String   @map("raw_input") @db.Text
-  intakeJson    Json     @map("intake_json")
-  source        String   @default("mock")
-  status        String   @default("pending_review")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  reviewToken      String   @unique @map("review_token")
+  packetRef        String?  @unique @map("packet_ref")
+  partnerId        String?  @map("partner_id")
+  submitterName    String?  @map("submitter_name")
+  submitterEmail   String?  @map("submitter_email")
+  submitterCompany String?  @map("submitter_company")
+  externalRef      String?  @map("external_ref")
+  idempotencyKey   String?  @map("idempotency_key")
+  fromEmail        String?  @map("from_email")
+  subject          String?
+  resendEmailId    String?  @map("resend_email_id")
+  rawInput         String   @map("raw_input") @db.Text
+  intakeJson       Json     @map("intake_json")
+  source           String   @default("mock")
+  status           String   @default("pending_review")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
+  @@unique([partnerId, idempotencyKey])
+  @@index([partnerId])
+  @@index([submitterEmail])
   @@map("campaign_intake_drafts")
+}
+
+// Partner API credentials — store hashed secrets only.
+model PartnerApiCredential {
+  id                String   @id @default(uuid())
+  partnerId         String   @unique @map("partner_id")
+  displayName       String   @map("display_name")
+  apiKeyHash        String   @map("api_key_hash")
+  apiKeyPrefix      String   @map("api_key_prefix")
+  isActive          Boolean  @default(true) @map("is_active")
+  rateLimitPerMin   Int      @default(30) @map("rate_limit_per_min")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("partner_api_credentials")
 }
