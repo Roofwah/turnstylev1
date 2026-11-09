@@ -74,15 +74,12 @@ export default function IntakeDemoPage() {
         <div className="mb-10 text-center">
           <img src="/tstyle.png" alt="Turnstyle" className="h-10 w-auto mx-auto mb-5" />
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">INTAKE</h1>
-          <p className="mt-3 text-white/50 text-sm sm:text-base">
-            Describe your promotion in 25 words or less.
-          </p>
         </div>
 
         {!presentation ? (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">
+              <label className="block text-xs uppercase tracking-wider text-white/85 mb-2">
                 Promotional concept
               </label>
               <textarea
@@ -93,12 +90,11 @@ export default function IntakeDemoPage() {
                 placeholder="We want to run a promotion across 200 stores where customers can win their purchase back."
                 className="w-full rounded-2xl bg-white/[0.04] border border-white/[0.1] px-4 py-4 text-base text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 resize-y min-h-[140px]"
               />
-              <p className="mt-2 text-[11px] text-white/30">Guidance only — longer briefs are fine.</p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Name</label>
+                <label className="block text-xs uppercase tracking-wider text-white/85 mb-2">Name</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -107,7 +103,7 @@ export default function IntakeDemoPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Email</label>
+                <label className="block text-xs uppercase tracking-wider text-white/85 mb-2">Email</label>
                 <input
                   type="email"
                   value={email}
@@ -119,7 +115,7 @@ export default function IntakeDemoPage() {
             </div>
 
             <div>
-              <label className="block text-xs uppercase tracking-wider text-white/40 mb-2">Company</label>
+              <label className="block text-xs uppercase tracking-wider text-white/85 mb-2">Company</label>
               <input
                 value={company}
                 onChange={(e) => setCompany(e.target.value)}
