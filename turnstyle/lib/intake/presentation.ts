@@ -1,15 +1,16 @@
 import type { ExtractedCampaignIntake } from './types'
 import type { PacketDisplayField, PacketPresentation, PacketSource } from './packet-types'
+import { extractFromNaturalLanguage } from './nl-extract'
 
 function money(n: number | null | undefined): string | null {
   if (n == null) return null
   return '$' + n.toLocaleString('en-AU', { maximumFractionDigits: 0 })
 }
 
-function inferPromotionType(intake: ExtractedCampaignIntake, concept: string): { value: string; confirmed: boolean } {
+function inferPromotionType(concept: string): { value: string; confirmed: boolean } {
   const lower = concept.toLowerCase()
-  if (/\btrade\b|tradie|b2b|wholesaler/i.test(lower)) {
-    return { value: 'Trade promotion', confirmed: /trade/i.test(lower) }
+  if (/\btrade\s+account\b|\btrade\b.*customers?|tradie|b2b|wholesaler/i.test(lower)) {
+    return { value: 'Trade promotion', confirmed: true }
   }
   if (/\bconsumer\b|customer|shopper/i.test(lower)) {
     return { value: 'Consumer promotion', confirmed: true }
@@ -17,16 +18,13 @@ function inferPromotionType(intake: ExtractedCampaignIntake, concept: string): {
   return { value: 'Consumer promotion', confirmed: false }
 }
 
-function inferMechanic(intake: ExtractedCampaignIntake, concept: string): { value: string; confirmed: boolean } {
+function inferMechanic(concept: string, drawType: string | null): { value: string; confirmed: boolean } {
   const lower = concept.toLowerCase()
-  const region = intake.regions[0]
-  const draw = region?.draw_type
-
+  if (/instant(?:ly)?\s+win/i.test(lower)) {
+    return { value: 'Instant win', confirmed: true }
+  }
   if (/win\s+(your|their|a)?\s*purchase\s+back|cashback|money\s+back|purchase\s+back/i.test(lower)) {
     return { value: 'Purchase-linked sweepstakes (win purchase back)', confirmed: true }
-  }
-  if (/instant\s+win/i.test(lower)) {
-    return { value: 'Instant win', confirmed: true }
   }
   if (/game\s+of\s+skill|skill\s+based|essay|caption/i.test(lower)) {
     return { value: 'Game of skill', confirmed: true }
@@ -34,7 +32,12 @@ function inferMechanic(intake: ExtractedCampaignIntake, concept: string): { valu
   if (/limited\s+offer|gift\s+with\s+purchase|gwp/i.test(lower)) {
     return { value: 'Limited offer / GWP', confirmed: true }
   }
-  if (/sweepstake|prize\s+draw|chance\s+to\s+win|win\s+a\b/i.test(lower) || draw === 'random_draw') {
+  if (
+    /purchase.*chance\s+to\s+win|chance\s+to\s+win.*purchase|customers?\s+who\s+purchase/i.test(lower)
+  ) {
+    return { value: 'Purchase-to-enter sweepstakes', confirmed: true }
+  }
+  if (/sweepstake|prize\s+draw|chance\s+to\s+win|win\s+a\b/i.test(lower) || drawType === 'random_draw') {
     return {
       value: 'Consumer sweepstakes',
       confirmed: /sweepstake|prize\s+draw|chance\s+to\s+win/i.test(lower),
@@ -43,10 +46,24 @@ function inferMechanic(intake: ExtractedCampaignIntake, concept: string): { valu
   return { value: 'Sweepstakes (assumed)', confirmed: false }
 }
 
-function storeCount(concept: string): { value: string; confirmed: boolean } | null {
-  const m = concept.match(/(\d[\d,]*)\s+stores?/i)
-  if (!m) return null
-  return { value: m[1].replace(/,/g, ''), confirmed: true }
+function formatDrawFrequency(freq: string | null, concept: string): { value: string; confirmed: boolean } | null {
+  if (/one\s+major\s+(?:prize\s+)?draw\s+at\s+the\s+end|at\s+the\s+end\s+of\s+the\s+promotion/i.test(concept)) {
+    return {
+      value: 'One major draw at the conclusion of the promotion',
+      confirmed: true,
+    }
+  }
+  if (freq === 'instant_win' || /instant/i.test(freq ?? '')) {
+    return { value: 'Instant win', confirmed: true }
+  }
+  if (freq === 'single_draw_at_conclusion' || freq === 'single_draw') {
+    return {
+      value: 'One draw at conclusion',
+      confirmed: freq === 'single_draw_at_conclusion',
+    }
+  }
+  if (freq) return { value: freq.replace(/_/g, ' '), confirmed: false }
+  return null
 }
 
 export function buildPacketPresentation(params: {
@@ -62,108 +79,135 @@ export function buildPacketPresentation(params: {
 }): PacketPresentation {
   const { intake, concept } = params
   const region = intake.regions[0]
-  const promoType = inferPromotionType(intake, concept)
-  const mechanic = inferMechanic(intake, concept)
-  const stores = storeCount(concept)
+  const nl = extractFromNaturalLanguage(concept)
+  const promoType = inferPromotionType(concept)
+  const mechanic = inferMechanic(concept, region?.draw_type ?? null)
 
   const fields: PacketDisplayField[] = []
 
+  const campaignName = intake.campaign_name ?? nl.campaignName
   fields.push({
     label: 'Campaign',
-    value: intake.campaign_name ?? 'To be confirmed',
-    confirmed: !!intake.campaign_name && !/assumed/i.test(intake.campaign_name),
+    value: campaignName ?? 'To be confirmed',
+    confirmed: !!(intake.campaign_name || nl.campaignName) && !nl.campaignNameSuggested,
   })
+  if (nl.campaignNameSuggested && campaignName) {
+    // Mark suggested name clearly without burying it as "Untitled"
+    const campaignField = fields[fields.length - 1]
+    campaignField.value = campaignName
+    campaignField.confirmed = false
+  }
+
   fields.push({ label: 'Promotion type', value: promoType.value, confirmed: promoType.confirmed })
   fields.push({ label: 'Likely mechanic', value: mechanic.value, confirmed: mechanic.confirmed })
 
-  if (intake.brand || intake.retailer || intake.promoter_name) {
-    fields.push({
-      label: 'Brand / retailer',
-      value: [intake.brand, intake.retailer ?? intake.promoter_name].filter(Boolean).join(' · '),
-      confirmed: !!(intake.brand || intake.retailer || intake.promoter_name),
-    })
+  const brand = intake.brand ?? nl.brand
+  const retailer = intake.retailer ?? nl.retailer
+  fields.push({
+    label: 'Brand',
+    value: brand ?? 'Not specified',
+    confirmed: !!brand,
+  })
+  fields.push({
+    label: 'Retailer',
+    value: retailer ?? 'Not specified',
+    confirmed: !!retailer,
+  })
+
+  const storeCount = nl.storeCount
+  if (storeCount != null) {
+    const label =
+      nl.storeRetailer || retailer
+        ? `${storeCount} ${nl.storeRetailer ?? retailer} stores`
+        : `${storeCount} stores`
+    fields.push({ label: 'Participating locations', value: label, confirmed: true })
   }
 
-  if (stores) {
-    fields.push({ label: 'Participating stores', value: stores.value, confirmed: stores.confirmed })
-  }
-
-  const prize =
-    region?.prizes?.[0] ??
-    region?.major_prizes?.[0] ??
-    null
+  const prize = region?.prizes?.[0] ?? region?.major_prizes?.[0] ?? nl.prizes[0] ?? null
   if (prize?.description) {
-    const val = prize.unit_value != null
-      ? `${prize.description} (${money(prize.unit_value)}${prize.quantity && prize.quantity > 1 ? ` × ${prize.quantity}` : ''})`
-      : prize.description
-    fields.push({ label: 'Prize', value: val, confirmed: true })
-  } else if (/win\s+(your|their|a)?\s*purchase\s+back|purchase\s+back|money\s+back|cashback/i.test(concept)) {
-    fields.push({ label: 'Prize', value: 'Purchase value refunded', confirmed: true })
+    fields.push({ label: 'Prize', value: prize.description, confirmed: true })
+    if (prize.quantity != null) {
+      fields.push({ label: 'Prize quantity', value: String(prize.quantity), confirmed: true })
+    }
+    if (prize.unit_value != null) {
+      fields.push({
+        label: 'Approximate prize value',
+        value: `AUD ${money(prize.unit_value)}`,
+        confirmed: true,
+      })
+    }
   } else {
     fields.push({ label: 'Prize', value: 'To be confirmed', confirmed: false })
   }
 
-  if (region?.start_date && region?.end_date) {
+  if (nl.periodLabel || (region?.start_date && region?.end_date)) {
     fields.push({
       label: 'Campaign dates',
-      value: `${region.start_date} → ${region.end_date}`,
+      value: nl.periodLabel ?? `${region!.start_date} → ${region!.end_date}`,
       confirmed: true,
     })
   } else {
     fields.push({ label: 'Campaign dates', value: 'To be confirmed', confirmed: false })
   }
 
-  if (region?.entry_mechanic) {
-    fields.push({ label: 'Entry method', value: region.entry_mechanic, confirmed: true })
-  } else if (region?.entry_threshold != null) {
+  if (region?.entry_mechanic || nl.entryMechanic) {
     fields.push({
-      label: 'Entry method',
-      value: `Purchase of $${region.entry_threshold}+ (threshold extracted)`,
+      label: 'Entry requirement',
+      value: region?.entry_mechanic ?? nl.entryMechanic!,
       confirmed: true,
     })
   } else {
-    fields.push({
-      label: 'Entry method',
-      value: 'To be determined',
-      confirmed: false,
-    })
+    fields.push({ label: 'Entry requirement', value: 'Not specified', confirmed: false })
   }
 
-  if (intake.regions.length) {
-    fields.push({
-      label: 'Geography',
-      value: intake.regions.map((r) => r.region_name).join(', '),
-      confirmed: intake.regions.length > 0,
-    })
+  fields.push({
+    label: 'Entry method',
+    value: 'Not specified',
+    confirmed: false,
+  })
+
+  const draw = formatDrawFrequency(region?.draw_frequency ?? nl.drawFrequency, concept)
+  if (draw) {
+    fields.push({ label: 'Draw frequency', value: draw.value, confirmed: draw.confirmed })
   }
 
-  const unresolved = [...intake.missing_fields]
-  if (!region?.start_date) unresolved.push('Confirm promotional dates')
-  if (!prize?.unit_value && !/purchase\s+back/i.test(concept)) unresolved.push('Establish maximum prize value')
-  if (!stores) unresolved.push('Confirm participating locations')
-  if (!region?.draw_frequency || region.draw_frequency === 'single_draw') {
-    unresolved.push('Determine winner frequency')
+  const geo =
+    region?.country ||
+    (region?.region_name === 'AU'
+      ? 'Australia'
+      : region?.region_name === 'NZ'
+        ? 'New Zealand'
+        : region?.region_name) ||
+    (nl.geography === 'AU' ? 'Australia' : nl.geography === 'NZ' ? 'New Zealand' : null)
+  if (geo) {
+    fields.push({ label: 'Geography', value: geo, confirmed: !!nl.geography || !!region })
   }
 
-  // Dedupe unresolved display messages
-  const unresolvedDisplay = [...new Set(unresolved.map((u) => {
-    if (u.includes('start_date') || u.includes('end_date')) return 'Confirm promotional dates'
-    if (u.includes('prizes')) return 'Confirm prize details and values'
-    if (u.includes('entry_')) return 'Confirm entry requirements'
-    if (u.includes('campaign_name')) return 'Confirm campaign name'
-    if (u.includes('promoter')) return 'Confirm promoter / brand'
-    return u
-  }))]
+  const unresolved: string[] = []
+  if (!brand) unresolved.push('Confirm brand (if distinct from retailer)')
+  if (!region?.entry_mechanic && !nl.entryMechanic) unresolved.push('Confirm entry method / digital channel')
+  if (!prize?.unit_value && prize?.description && !/refunded/i.test(prize.description)) {
+    unresolved.push('Confirm prize value')
+  }
+  if (!nl.periodLabel && !region?.start_date) unresolved.push('Confirm promotional dates')
+
+  // Filter noisy assumption lines for display
+  const displayAssumptions = intake.assumptions.filter(
+    (a) =>
+      !/^Heuristic extraction/i.test(a) &&
+      !/Draw frequency assumed/i.test(a) &&
+      !/standard extraction/i.test(a)
+  )
 
   return {
     packetRef: params.packetRef,
-    campaignName: intake.campaign_name ?? 'Untitled promotion',
+    campaignName: campaignName ?? 'Untitled promotion',
     promotionType: promoType.value,
     likelyMechanic: mechanic.value,
     summary: intake.generated_summary,
     fields,
-    assumptions: intake.assumptions,
-    unresolved: unresolvedDisplay,
+    assumptions: displayAssumptions,
+    unresolved: [...new Set(unresolved)],
     originalConcept: concept,
     submitterName: params.submitterName,
     submitterEmail: params.submitterEmail,

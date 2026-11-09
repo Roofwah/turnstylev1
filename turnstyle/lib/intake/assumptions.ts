@@ -102,9 +102,9 @@ function applyRegionAssumptions(region: ExtractedRegion, assumptions: string[]):
     assumptions.push(`${out.region_name}: Permit review flagged — ${reviewFlags.join(', ')}.`)
   }
 
-  if (!out.draw_frequency) {
+  if (!out.draw_frequency && out.prizes.length > 0 && out.draw_type === 'random_draw') {
     out.draw_frequency = 'single_draw'
-    assumptions.push(`${out.region_name}: Draw frequency assumed as single draw at conclusion.`)
+    assumptions.push(`${out.region_name}: Draw frequency not stated — assumed single draw at conclusion.`)
   }
 
   return out
@@ -126,8 +126,11 @@ export function collectMissingFields(intake: ExtractedCampaignIntake): string[] 
     const prefix = r.region_name
     if (!r.start_date) missing.push(`${prefix}.start_date`)
     if (!r.end_date) missing.push(`${prefix}.end_date`)
-    if (!r.entry_mechanic) missing.push(`${prefix}.entry_mechanic`)
-    if (r.entry_threshold == null) missing.push(`${prefix}.entry_threshold`)
+    if (!r.entry_mechanic && !r.purchase_requirement) missing.push(`${prefix}.entry_mechanic`)
+    // Threshold only required when spend amount is the entry mechanic
+    if (r.entry_mechanic && /spend|\$/i.test(r.entry_mechanic) && r.entry_threshold == null) {
+      missing.push(`${prefix}.entry_threshold`)
+    }
     if (r.prizes.length === 0) missing.push(`${prefix}.prizes`)
   }
 

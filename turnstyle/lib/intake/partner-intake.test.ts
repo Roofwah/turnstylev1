@@ -106,7 +106,7 @@ test('short concept: win purchase back extracts prize + name', () => {
   const intake = finalizeMockIntake(raw, mockExtractCampaign(raw))
   expect(intake.campaign_name).toBe('Win Your Purchase Back')
   expect(intake.regions[0]?.prizes[0]?.description?.toLowerCase().includes('purchase')).toBe(true)
-  expect(intake.assumptions.some((a) => /stores/i.test(a))).toBe(true)
+  expect(!!(intake.notes && /200/.test(intake.notes))).toBe(true)
 })
 
 test('short concept: Disneyland / Colgate recognises brand and prize', () => {
@@ -130,7 +130,7 @@ test('presentation distinguishes confirmed vs assumed', () => {
     source: 'demo',
     createdAt: new Date().toISOString(),
   })
-  expect(p.fields.some((f) => f.label === 'Participating stores' && f.confirmed)).toBe(true)
+  expect(p.fields.some((f) => f.label === 'Participating locations' && f.confirmed)).toBe(true)
   expect(p.fields.some((f) => f.label === 'Campaign dates' && !f.confirmed)).toBe(true)
   expect(p.packetRef).toBe('TS-PKT-TEST')
 })

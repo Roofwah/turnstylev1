@@ -44,7 +44,8 @@ export type ProcessPacketResult = {
   reviewToken: string
   intake: ExtractedCampaignIntake
   presentation: PacketPresentation
-  interpretationSource: 'ai' | 'mock'
+  interpretationSource: 'ai' | 'heuristic'
+  degradedReason?: string | null
   idempotentReplay: boolean
   emails: {
     submitterSent: boolean

@@ -1,5 +1,10 @@
 import type { ExtractedCampaignIntake, ExtractedPrize, ExtractedRegion } from './types'
 import { generateSummary } from './generateSummary'
+import {
+  applyNlExtractionToRegion,
+  extractFromNaturalLanguage,
+  looksLikeStructuredBrief,
+} from './nl-extract'
 
 const REPCO_SAMPLE_MARKERS = [
   'filtration competition',
@@ -467,105 +472,25 @@ function repcoFiltrationExtraction(raw: string): ExtractedCampaignIntake {
   return intake
 }
 
-function inferCampaignName(raw: string, brands: string[]): string | null {
-  if (/filtration/i.test(raw)) return 'Repco Filtration Competition'
-  if (/black\s*friday/i.test(raw) && brands.length) {
-    return `${brands[0]} Black Friday`
-  }
-  if (/black\s*friday/i.test(raw) && /repco/i.test(raw)) return 'Repco Black Friday'
-  if (/win\s+(your|their|a)?\s*purchase\s+back|purchase\s+back/i.test(raw)) return 'Win Your Purchase Back'
-  if (/disneyland/i.test(raw)) {
-    const brand = raw.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+customers?/i)
-    return brand ? `${brand[1]} Disneyland Promotion` : 'Disneyland Trip Promotion'
-  }
-  const nameMatch = raw.match(/(?:running a|campaign(?:\s+name)?|promotion(?:\s+name)?)\s*[:\-]\s*([^\n.]+)/i)
-  if (nameMatch) return nameMatch[1].trim()
-  return null
-}
-
-function inferBrandFromConcept(raw: string): string | null {
-  if (/repco/i.test(raw)) return 'Repco'
-  if (/colgate/i.test(raw)) return 'Colgate'
-  if (/valvoline/i.test(raw)) return 'Valvoline'
-  const m = raw.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+customers?\b/)
-  return m?.[1] ?? null
-}
-
-/** Enrich short free-text concepts (not structured briefs). */
-function enrichShortConcept(
-  raw: string,
-  region: ExtractedRegion,
-  assumptions: string[]
-): ExtractedRegion {
-  const out = { ...region, prizes: [...region.prizes], major_prizes: [...region.major_prizes] }
-
-  if (/win\s+(your|their|a)?\s*purchase\s+back|money\s+back|cashback|purchase\s+back/i.test(raw) && out.prizes.length === 0) {
-    out.prizes = [{
-      type: 'major',
-      description: 'Purchase value refunded',
-      quantity: null,
-      unit_value: null,
-      total_value: null,
-    }]
-    out.major_prizes = out.prizes
-    out.draw_type = 'random_draw'
-    assumptions.push('Likely purchase-linked consumer sweepstakes (win purchase back).')
-    assumptions.push('Maximum refund / prize cap not stated — left unknown.')
-  }
-
-  if (/chance\s+to\s+win|win\s+a\b|prize\s+draw|sweepstake/i.test(raw) && out.prizes.length === 0) {
-    const trip = raw.match(/win\s+(?:a\s+)?(.+?)(?:\.|$)/i)
-    const desc = trip?.[1]?.trim() || 'Prize to be confirmed'
-    out.prizes = [{
-      type: 'major',
-      description: desc.replace(/^family\s+trip\s+to\s+/i, 'Family trip to ').slice(0, 180),
-      quantity: 1,
-      unit_value: null,
-      total_value: null,
-    }]
-    out.major_prizes = out.prizes
-    out.draw_type = 'random_draw'
-    assumptions.push('Likely consumer sweepstakes — entry method not confirmed.')
-  }
-
-  const stores = raw.match(/(\d[\d,]*)\s+stores?/i)
-  if (stores) {
-    assumptions.push(`Participating stores mentioned: ${stores[1].replace(/,/g, '')}.`)
-  }
-
-  if (/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(raw)
-    && !out.start_date) {
-    const month = raw.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i)?.[1]
-    if (month) assumptions.push(`Promotion month mentioned (${month}) but year/exact dates not confirmed.`)
-  }
-
-  if (!out.entry_mechanic && /purchase|spend|buy/i.test(raw)) {
-    assumptions.push('Purchase requirement implied; exact entry mechanic not confirmed.')
-  }
-
-  if (!/\bAU\b|\bNZ\b|australia|new zealand/i.test(raw)) {
-    assumptions.push('Geography not stated — defaulted to AU for intake structuring.')
-  }
-
-  return out
-}
-
 function heuristicExtract(raw: string): ExtractedCampaignIntake {
-  const assumptions: string[] = ['Heuristic extraction used — review all fields carefully.']
+  // Visible degraded-mode marker — not equivalent to AI interpretation
+  const assumptions: string[] = [
+    'Interpreted with standard extraction (AI interpretation unavailable). Review fields carefully.',
+  ]
 
-  let retailer: string | null = inferBrandFromConcept(raw)
+  const nl = extractFromNaturalLanguage(raw)
+  const structured = looksLikeStructuredBrief(raw)
 
   const { au: auBlock, nz: nzBlock } = splitAuNzBlocks(raw)
   const hasAu = /\bAU\b|australia/i.test(raw)
   const hasNz = /\bNZ\b|new zealand/i.test(raw)
   const regions: ExtractedRegion[] = []
-  const isShortConcept = raw.length < 500 && !/major\s+prize/i.test(raw)
 
   if (hasAu || (!hasAu && !hasNz)) {
     const partial = parseRegionBlock(hasAu ? auBlock : raw, 'AU')
     let region: ExtractedRegion = {
-      region_name: 'AU',
-      country: 'Australia',
+      region_name: nl.geography === 'NZ' ? 'NZ' : 'AU',
+      country: nl.geography === 'NZ' ? 'New Zealand' : 'Australia',
       states: null,
       start_date: partial.start_date ?? null,
       end_date: partial.end_date ?? null,
@@ -578,20 +503,26 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
       prizes: partial.prizes ?? [],
       major_prizes: partial.major_prizes ?? [],
       minor_prizes: partial.minor_prizes ?? [],
-      draw_type: 'random_draw',
+      draw_type: partial.prizes?.length ? 'random_draw' : null,
       draw_frequency: null,
       draw_date: null,
       winner_publication_date: null,
       total_prize_value: partial.total_prize_value ?? null,
       permit_flags: [],
     }
-    if (isShortConcept) region = enrichShortConcept(raw, region, assumptions)
+    // Always apply NL extraction for free-text; merge after structured line parsers
+    if (!structured || region.prizes.length === 0 || !region.start_date) {
+      region = applyNlExtractionToRegion(region, nl)
+    }
+    if (!nl.geography && !hasAu && !hasNz) {
+      assumptions.push('Geography not stated — defaulted to AU for intake structuring.')
+    }
     regions.push(region)
   }
 
   if (hasNz) {
     const partial = parseRegionBlock(nzBlock, 'NZ')
-    regions.push({
+    let region: ExtractedRegion = {
       region_name: 'NZ',
       country: 'New Zealand',
       states: null,
@@ -612,32 +543,41 @@ function heuristicExtract(raw: string): ExtractedCampaignIntake {
       winner_publication_date: null,
       total_prize_value: partial.total_prize_value ?? null,
       permit_flags: ['NONE_REQUIRED'],
-    })
-    if (regions.length > 1) {
-      assumptions.push('AU and NZ split into separate region sections.')
     }
+    if (!structured || region.prizes.length === 0) {
+      region = applyNlExtractionToRegion(region, nl)
+    }
+    regions.push(region)
+    if (regions.length > 1) assumptions.push('AU and NZ split into separate region sections.')
   }
 
-  const allBrands = regions.flatMap(r => r.participating_brands)
-  const campaignName = inferCampaignName(raw, allBrands)
+  assumptions.push(...nl.assumptions)
+
+  const campaignName = nl.campaignName
+  if (nl.campaignNameSuggested && campaignName) {
+    assumptions.push(`Campaign name suggested from prize description: "${campaignName}".`)
+  }
+
+  const notes = nl.notes.length ? nl.notes.join(' · ') : null
 
   const intake: ExtractedCampaignIntake = {
     raw_input: raw,
     campaign_name: campaignName,
-    promoter_name: retailer,
-    brand: retailer,
-    retailer,
+    promoter_name: nl.retailer,
+    brand: nl.brand,
+    retailer: nl.retailer,
     regions,
-    notes: null,
+    notes,
     assumptions,
     missing_fields: [],
     confidence_scores: {
-      campaign_name: campaignName ? 0.65 : 0.25,
-      promoter_name: retailer ? 0.75 : 0.25,
+      campaign_name: campaignName ? (nl.campaignNameSuggested ? 0.7 : 0.9) : 0.25,
+      retailer: nl.retailer ? 0.9 : 0.2,
+      brand: nl.brand ? 0.85 : 0.2,
       ...Object.fromEntries(
-        regions.flatMap(r => [
+        regions.flatMap((r) => [
           [`${r.region_name}.dates`, r.start_date && r.end_date ? 0.9 : 0.3],
-          [`${r.region_name}.prizes`, r.prizes.length ? 0.85 : 0.2],
+          [`${r.region_name}.prizes`, r.prizes.length ? 0.9 : 0.2],
         ])
       ),
     },

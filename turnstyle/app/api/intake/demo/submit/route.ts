@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       packet_ref: result.packetRef,
       presentation: result.presentation,
       interpretation_source: result.interpretationSource,
+      degraded: result.interpretationSource !== 'ai',
       emails: {
         submitter: result.emails.submitterSent,
         flow_marketing: result.emails.flowSent,

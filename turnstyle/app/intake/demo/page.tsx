@@ -7,6 +7,8 @@ type SubmitResponse = {
   ok: boolean
   packet_ref?: string
   presentation?: PacketPresentation
+  interpretation_source?: string
+  degraded?: boolean
   emails?: {
     submitter: boolean
     flow_marketing: boolean
@@ -159,8 +161,11 @@ export default function IntakeDemoPage() {
                     <dt className="text-xs uppercase tracking-wider text-white/40 pt-0.5">{f.label}</dt>
                     <dd className="text-sm text-white/90">
                       {f.value}
-                      {!f.confirmed && (
-                        <span className="ml-2 text-[11px] text-amber-400/90">AI assumption / TBC</span>
+                      {!f.confirmed && f.value !== 'Not specified' && f.value !== 'To be confirmed' && f.value !== 'To be determined' && (
+                        <span className="ml-2 text-[11px] text-amber-400/90">Suggested</span>
+                      )}
+                      {!f.confirmed && (f.value === 'Not specified' || f.value === 'To be confirmed' || f.value === 'To be determined') && (
+                        <span className="ml-2 text-[11px] text-white/35">Unknown</span>
                       )}
                     </dd>
                   </div>

@@ -82,9 +82,10 @@ function draftToResult(
     partnerId: string | null
     createdAt: Date
   },
-  interpretationSource: 'ai' | 'mock',
+  interpretationSource: 'ai' | 'heuristic',
   idempotentReplay: boolean,
-  emails: ProcessPacketResult['emails']
+  emails: ProcessPacketResult['emails'],
+  degradedReason?: string | null
 ): ProcessPacketResult {
   const packetRef = draft.packetRef ?? 'UNKNOWN'
   const intake = draft.intakeJson as unknown as ExtractedCampaignIntake
@@ -108,6 +109,7 @@ function draftToResult(
     interpretationSource,
     idempotentReplay,
     emails,
+    degradedReason: degradedReason ?? null,
   }
 }
 
@@ -121,14 +123,15 @@ export async function processIntakePacket(input: PacketSubmitInput): Promise<Pro
     if (existing?.packetRef) {
       return draftToResult(
         existing,
-        existing.source.includes('ai') ? 'ai' : 'mock',
+        existing.source.includes('ai') ? 'ai' : 'heuristic',
         true,
-        { submitterSent: false, flowSent: false }
+        { submitterSent: false, flowSent: false },
+        null
       )
     }
   }
 
-  const { intake, source } = await interpretCampaignBrief(input.concept)
+  const { intake, source, degradedReason } = await interpretCampaignBrief(input.concept)
   const packetRef = newPacketRef()
   const reviewToken = newReviewToken()
 
@@ -187,5 +190,6 @@ export async function processIntakePacket(input: PacketSubmitInput): Promise<Pro
     interpretationSource: source,
     idempotentReplay: false,
     emails,
+    degradedReason,
   }
 }
