@@ -70,8 +70,8 @@ export default function IntakeDemoPage() {
 
       <div className="relative max-w-2xl mx-auto px-6 py-14">
         <div className="mb-10 text-center">
-          <p className="text-[11px] uppercase tracking-[0.2em] text-white/35 mb-3">Turnstyle</p>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">TURNSTYLE INTAKE</h1>
+          <img src="/tstyle.png" alt="Turnstyle" className="h-10 w-auto mx-auto mb-5" />
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">INTAKE</h1>
           <p className="mt-3 text-white/50 text-sm sm:text-base">
             Describe your promotion in 25 words or less.
           </p>
