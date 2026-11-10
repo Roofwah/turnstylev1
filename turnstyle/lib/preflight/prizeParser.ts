@@ -11,6 +11,12 @@ import {
   PrizeComplexityTier,
   PrizeTriggers,
 } from './types'
+import {
+  ANTHROPIC_MESSAGES_URL,
+  anthropicHeaders,
+  anthropicRequestBody,
+  extractAnthropicText,
+} from '@/lib/anthropic/client'
 
 // ─── Keyword detection ────────────────────────
 
@@ -113,15 +119,22 @@ async function parseWithAi(req: PrizeParseRequest): Promise<{ parsed: ParsedPriz
 ${req.quantity ? `Quantity: ${req.quantity}` : ''}
 ${req.valueIncGst ? `Value (incl. GST): $${req.valueIncGst}` : ''}`
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not configured')
+  }
+
+  const response = await fetch(ANTHROPIC_MESSAGES_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
-      system: PRIZE_PARSE_SYSTEM,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
+    headers: anthropicHeaders(apiKey),
+    body: JSON.stringify(
+      anthropicRequestBody({
+        system: PRIZE_PARSE_SYSTEM,
+        user: userMessage,
+        maxTokens: 500,
+        effort: 'low',
+      })
+    ),
   })
 
   if (!response.ok) {
@@ -129,7 +142,7 @@ ${req.valueIncGst ? `Value (incl. GST): $${req.valueIncGst}` : ''}`
   }
 
   const data = await response.json()
-  const text = data.content?.[0]?.text ?? '{}'
+  const text = extractAnthropicText(data.content) || '{}'
   const tokensUsed = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0)
 
   let parsed: Partial<ParsedPrize>

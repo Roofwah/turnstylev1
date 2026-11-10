@@ -5,6 +5,12 @@
 // ─────────────────────────────────────────────
 
 import { CampaignBuilderInput, TermsDocument, PreflightIssue } from './types'
+import {
+  ANTHROPIC_MESSAGES_URL,
+  anthropicHeaders,
+  anthropicRequestBody,
+  extractAnthropicText,
+} from '@/lib/anthropic/client'
 
 const AI_REVIEW_SYSTEM = `You are a senior compliance reviewer specialising in Australian trade promotions.
 You review Terms & Conditions for drafting quality, ambiguity, contradictions, and operational risks.
@@ -91,15 +97,22 @@ export async function runAiReview(
 ): Promise<{ issues: PreflightIssue[]; tokensUsed: number }> {
   const userPrompt = buildUserPrompt(builder, doc)
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    throw new Error('ANTHROPIC_API_KEY is not configured')
+  }
+
+  const response = await fetch(ANTHROPIC_MESSAGES_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      system: AI_REVIEW_SYSTEM,
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
+    headers: anthropicHeaders(apiKey),
+    body: JSON.stringify(
+      anthropicRequestBody({
+        system: AI_REVIEW_SYSTEM,
+        user: userPrompt,
+        maxTokens: 1500,
+        effort: 'medium',
+      })
+    ),
   })
 
   if (!response.ok) {
@@ -108,7 +121,7 @@ export async function runAiReview(
 
   const data = await response.json()
   const tokensUsed = (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0)
-  const text = data.content?.[0]?.text ?? '[]'
+  const text = extractAnthropicText(data.content) || '[]'
 
   let rawIssues: Partial<PreflightIssue>[]
   try {

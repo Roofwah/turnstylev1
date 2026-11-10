@@ -69,24 +69,20 @@ async function extractWithAi(
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const { anthropicHeaders, anthropicRequestBody, extractAnthropicText, ANTHROPIC_MESSAGES_URL } =
+      await import('@/lib/anthropic/client')
+
+    const response = await fetch(ANTHROPIC_MESSAGES_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: INTAKE_SYSTEM,
-        messages: [
-          {
-            role: 'user',
-            content: `Extract campaign intake JSON from this brief:\n\n${rawInput}`,
-          },
-        ],
-      }),
+      headers: anthropicHeaders(apiKey),
+      body: JSON.stringify(
+        anthropicRequestBody({
+          system: INTAKE_SYSTEM,
+          user: `Extract campaign intake JSON from this brief:\n\n${rawInput}`,
+          maxTokens: 4000,
+          effort: 'low',
+        })
+      ),
     })
 
     if (!response.ok) {
@@ -98,7 +94,7 @@ async function extractWithAi(
     }
 
     const data = await response.json()
-    const text = data.content?.[0]?.text ?? ''
+    const text = extractAnthropicText(data.content)
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       return { error: 'invalid_json', detail: 'No JSON object in AI response' }
