@@ -186,15 +186,15 @@ export function buildSubmitterPacketEmail(params: {
   const firstName = firstNameFrom(presentation.submitterName)
   const overview = selectOverviewFields(presentation.fields)
 
-  const subject = `Your Campaign Packet — ${presentation.campaignName}`
+  const subject = `Your campaign summary — ${presentation.campaignName}`
 
   const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Campaign Packet</title></head>
+<title>Campaign summary</title></head>
 <body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#111827;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your initial Campaign Packet is ready for review.</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Your initial campaign summary is ready for review.</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
@@ -205,10 +205,10 @@ export function buildSubmitterPacketEmail(params: {
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Hi ${escapeHtml(firstName)},</p>
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;">Thanks for sharing your promotional idea.</p>
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#374151;">
-            We've taken your concept and put together an initial Campaign Packet, outlining how your promotion could work.
+            We've taken your concept and put together an initial campaign summary, outlining how your promotion could work.
           </p>
           <p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:#374151;">
-            You'll find a summary below, including the key campaign details, suggested mechanics and a few things we may need to clarify.
+            You'll find the key details below, including suggested mechanics and a few things we may need to clarify.
           </p>
           <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#374151;">
             This is a starting point, not a final campaign plan. Our promotions team will review the details and be in touch about the next steps.
@@ -217,10 +217,10 @@ export function buildSubmitterPacketEmail(params: {
         </td></tr>
 
         <tr><td style="padding:20px 28px 28px;border-left:1px solid #e5e7eb;border-right:1px solid #e5e7eb;">
-          <!-- Campaign Packet card -->
+          <!-- Campaign summary card -->
           <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;padding:22px 22px 18px;">
             <div style="font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#9ca3af;margin-bottom:10px;">
-              Campaign Packet
+              Campaign summary
             </div>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
               <tr>
@@ -235,7 +235,7 @@ export function buildSubmitterPacketEmail(params: {
               </tr>
             </table>
             <div style="font-size:13px;color:#9ca3af;margin:8px 0 16px;">
-              ${escapeHtml(presentation.packetRef)} · Version 1.0
+              Ref ${escapeHtml(presentation.packetRef)} · Version 1.0
             </div>
 
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #f3f4f6;">
@@ -257,7 +257,7 @@ export function buildSubmitterPacketEmail(params: {
               Next steps
             </div>
             <p style="margin:0;font-size:14px;line-height:1.55;color:#374151;">
-              Our promotions team will review this Campaign Packet and contact you about the next steps. No further action is needed from you right now.
+              Our promotions team will review this summary and contact you about the next steps. No further action is needed from you right now.
             </p>
           </div>
         </td></tr>
@@ -266,7 +266,7 @@ export function buildSubmitterPacketEmail(params: {
           <p style="margin:0 0 4px;font-size:12px;color:#6b7280;">${escapeHtml(branding.footerLine)}</p>
           <p style="margin:0;font-size:11px;color:#9ca3af;line-height:1.5;">
             ${escapeHtml(branding.contactEmail)}
-            · Packet ${escapeHtml(presentation.packetRef)}
+            · Ref ${escapeHtml(presentation.packetRef)}
             · This email is not a quote, permit or approval.
           </p>
         </td></tr>
@@ -281,12 +281,12 @@ export function buildSubmitterPacketEmail(params: {
     '',
     'Thanks for sharing your promotional idea.',
     '',
-    "We've taken your concept and put together an initial Campaign Packet, outlining how your promotion could work.",
+    "We've taken your concept and put together an initial campaign summary, outlining how your promotion could work.",
     '',
     'Your campaign starts here.',
     '',
-    `CAMPAIGN PACKET — ${presentation.campaignName}`,
-    `${presentation.packetRef} · Version 1.0 · Draft`,
+    `CAMPAIGN SUMMARY — ${presentation.campaignName}`,
+    `Ref ${presentation.packetRef} · Version 1.0 · Draft`,
     '',
     ...overview.map((f) => `${f.label}: ${f.value}`),
     '',
@@ -297,7 +297,7 @@ export function buildSubmitterPacketEmail(params: {
       ? `Proposed abbreviated T&Cs (DRAFT):\n${abbrev.text}`
       : 'Draft abbreviated terms and conditions will be prepared once the remaining campaign details are confirmed.',
     '',
-    'Next steps: Our promotions team will review this Campaign Packet and contact you.',
+    'Next steps: Our promotions team will review this summary and contact you.',
     '',
     branding.footerLine,
     branding.contactEmail,

@@ -92,14 +92,16 @@ expect(firstNameFrom('Troy Wilson') === 'Troy', 'first name')
     appUrl: 'https://example.turnstylehost.com',
   })
 
-  expect(email.subject.includes('Campaign Packet'), 'subject')
+  expect(email.subject.includes('campaign summary'), 'subject')
+  expect(!/packet/i.test(email.subject), 'subject avoids packet')
   expect(email.html.includes('partners/zitcha-logo.png'), 'zitcha logo in html')
   expect(email.html.includes('Sales Promotions by'), 'co-brand label')
   expect(email.html.includes('tstyleblk.jpg'), 'turnstyle logo')
   expect(email.html.includes('Thanks for sharing your promotional idea'), 'warm intro')
   expect(email.html.includes('Your campaign starts here'), 'closing line')
-  expect(email.html.includes('Campaign Packet'), 'packet header')
-  expect(email.html.includes(presentation.packetRef), 'packet ref')
+  expect(email.html.includes('Campaign summary'), 'summary header')
+  expect(!/Campaign Packet/i.test(email.html), 'html avoids Campaign Packet')
+  expect(email.html.includes(presentation.packetRef), 'reference retained')
   expect(email.html.includes('Version 1.0'), 'version')
   expect(email.html.includes('Draft'), 'draft badge')
   expect(email.html.includes('Details to Confirm'), 'details section')
@@ -131,7 +133,7 @@ expect(firstNameFrom('Troy Wilson') === 'Troy', 'first name')
     ),
     'fallback terms copy'
   )
-  expect(email.html.includes('Campaign Packet'), 'still shows packet card')
+  expect(email.html.includes('Campaign summary'), 'still shows summary card')
   expect(email.html.includes('partners/zitcha-logo.png'), 'demo still zitcha branded')
 }
 

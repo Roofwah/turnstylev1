@@ -141,10 +141,10 @@ export default function IntakeDemoPage() {
         ) : (
           <div className="space-y-6">
             <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-200/90">
-              Thanks — your Campaign Packet is ready.
+              Thanks — your campaign summary is ready.
               {result?.emails?.submitter
                 ? ' A copy has been sent to your email address.'
-                : ' We could not confirm email delivery — your packet was still saved.'}
+                : ' We could not confirm email delivery — your summary was still saved.'}
             </div>
 
             <div className="rounded-2xl border border-white/[0.1] bg-white/[0.03] p-6 sm:p-8">
@@ -186,7 +186,7 @@ export default function IntakeDemoPage() {
                 <p className="text-xs text-white/35 mb-1">Original concept</p>
                 <p className="text-sm text-white/60 italic">&ldquo;{presentation.originalConcept}&rdquo;</p>
                 <p className="mt-4 text-[11px] text-white/30 font-mono">
-                  Packet {presentation.packetRef}
+                  Ref {presentation.packetRef}
                 </p>
               </div>
             </div>
