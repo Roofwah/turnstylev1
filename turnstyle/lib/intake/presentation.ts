@@ -177,8 +177,16 @@ export function buildPacketPresentation(params: {
       ? 'Australia'
       : region?.region_name === 'NZ'
         ? 'New Zealand'
-        : region?.region_name) ||
-    (nl.geography === 'AU' ? 'Australia' : nl.geography === 'NZ' ? 'New Zealand' : null)
+        : region?.region_name === 'US'
+          ? 'United States'
+          : region?.region_name) ||
+    (nl.geography === 'AU'
+      ? 'Australia'
+      : nl.geography === 'NZ'
+        ? 'New Zealand'
+        : nl.geography === 'US'
+          ? 'United States'
+          : null)
   if (geo) {
     fields.push({ label: 'Geography', value: geo, confirmed: !!nl.geography || !!region })
   }
@@ -201,7 +209,7 @@ export function buildPacketPresentation(params: {
 
   return {
     packetRef: params.packetRef,
-    campaignName: campaignName ?? 'Untitled promotion',
+    campaignName: campaignName ?? 'Promotion',
     promotionType: promoType.value,
     likelyMechanic: mechanic.value,
     summary: intake.generated_summary,

@@ -6,6 +6,7 @@ import type {
 } from './types'
 import { applyTurnstyleAssumptions, collectMissingFields } from './assumptions'
 import { generateSummary } from './generateSummary'
+import { extractFromNaturalLanguage, suggestCampaignName } from './nl-extract'
 
 function asString(v: unknown): string | null {
   if (v == null) return null
@@ -169,9 +170,47 @@ export function normalizeIntake(raw: unknown, rawInput: string): ExtractedCampai
   return intake
 }
 
+function enrichCampaignNameFromConcept(intake: ExtractedCampaignIntake, rawInput: string): ExtractedCampaignIntake {
+  const current = intake.campaign_name?.trim() || ''
+  const isPlaceholder =
+    !current ||
+    /^untitled(\s+promotion)?$/i.test(current) ||
+    /^promotion$/i.test(current) ||
+    /^tbc$/i.test(current) ||
+    /^to be confirmed$/i.test(current)
+
+  if (!isPlaceholder) return intake
+
+  const nl = extractFromNaturalLanguage(rawInput)
+  const suggested =
+    nl.campaignName ||
+    suggestCampaignName({
+      brand: intake.brand ?? nl.brand,
+      retailer: intake.retailer ?? nl.retailer,
+      prize: intake.regions[0]?.prizes?.[0] ?? nl.prizes[0] ?? null,
+      drawFrequency: intake.regions[0]?.draw_frequency ?? nl.drawFrequency,
+      raw: rawInput,
+    }).name
+
+  if (!suggested) return intake
+
+  const next = { ...intake, campaign_name: suggested }
+  if (!next.assumptions.some((a) => /Campaign name suggested/i.test(a))) {
+    next.assumptions = [`Campaign name suggested from concept: "${suggested}".`, ...next.assumptions]
+  }
+  if (next.confidence_scores) {
+    next.confidence_scores = { ...next.confidence_scores, campaign_name: 0.7 }
+  }
+  // Prefer NL retailer/brand when AI left them empty
+  if (!next.retailer && nl.retailer) next.retailer = nl.retailer
+  if (!next.brand && nl.brand) next.brand = nl.brand
+  return next
+}
+
 /** Full pipeline: normalize → assumptions → missing fields → summary */
 export function finalizeIntake(raw: unknown, rawInput: string): ExtractedCampaignIntake {
   let intake = normalizeIntake(raw, rawInput)
+  intake = enrichCampaignNameFromConcept(intake, rawInput)
   intake = applyTurnstyleAssumptions(intake)
   intake.missing_fields = collectMissingFields(intake)
   intake.generated_summary = generateSummary(intake)
@@ -180,6 +219,7 @@ export function finalizeIntake(raw: unknown, rawInput: string): ExtractedCampaig
 
 export function finalizeMockIntake(rawInput: string, extracted: ExtractedCampaignIntake): ExtractedCampaignIntake {
   let intake = { ...extracted, raw_input: rawInput }
+  intake = enrichCampaignNameFromConcept(intake, rawInput)
   intake = applyTurnstyleAssumptions(intake)
   intake.missing_fields = collectMissingFields(intake)
   intake.generated_summary = generateSummary(intake)

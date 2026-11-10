@@ -58,7 +58,9 @@ Rules:
 - Distinguish brand vs retailer: "Repco stores" → retailer=Repco, brand=null. "Colgate customers" → brand=Colgate.
 - Extract store counts ("200 Repco stores"), prize names, quantities, and dollar values when stated.
 - "Chance to win a Ford Ranger Raptor valued at $90,000" → prize description + unit_value 90000; suggest campaign_name "Win a Ford Ranger Raptor" in assumptions.
-- Split AU and NZ only when both appear. Australia → AU region.`
+- Always propose a campaign_name from the concept — never leave it null or "Untitled". Prefer "{Retailer/Brand} {$value} {Mechanic} promotion" when possible (e.g. "7 Eleven $5k Instant Win promotion"). Mark the suggestion in assumptions.
+- Recognise retailer aliases like 7/11 → "7 Eleven", and compact money like 5k → 5000.
+- Split AU and NZ only when both appear. Australia → AU region. United States / US → US region.`
 
 async function extractWithAi(
   rawInput: string

@@ -3,7 +3,7 @@
  * Run: npx esbuild lib/intake/nl-extract.test.ts --bundle --platform=node --outfile=/tmp/nl-test.js && node /tmp/nl-test.js
  */
 
-import { finalizeMockIntake } from './normalize'
+import { finalizeIntake, finalizeMockIntake } from './normalize'
 import { mockExtractCampaign } from './mock'
 import { buildPacketPresentation } from './presentation'
 import { extractFromNaturalLanguage } from './nl-extract'
@@ -149,6 +149,56 @@ test('does not invent brand from retailer-only brief', () => {
   const intake = finalizeMockIntake(REPCO, mockExtractCampaign(REPCO))
   expect(intake.brand).toBe(null)
   expect(intake.retailer).toBe('Repco')
+})
+
+test('7/11 US instant win — title from concept, never Untitled', () => {
+  const concept =
+    'Build me a promo for 7/11 here in the US I want an instant win with a prize of 5k.'
+  const nl = extractFromNaturalLanguage(concept)
+  expect(nl.retailer).toBe('7 Eleven')
+  expect(nl.prizes[0]?.unit_value).toBe(5000)
+  expect(nl.drawFrequency).toBe('instant_win')
+  expect(nl.geography).toBe('US')
+  expect(nl.campaignName).toBe('7 Eleven $5k Instant Win promotion')
+
+  const intake = finalizeMockIntake(concept, mockExtractCampaign(concept))
+  expect(intake.campaign_name).toBe('7 Eleven $5k Instant Win promotion')
+  expect(intake.retailer).toBe('7 Eleven')
+
+  const p = buildPacketPresentation({
+    packetRef: 'T',
+    intake,
+    concept,
+    submitterName: 'x',
+    submitterEmail: 'x@y.com',
+    submitterCompany: 'Co',
+    partnerId: 'demo',
+    source: 'demo',
+    createdAt: new Date().toISOString(),
+  })
+  expect(p.campaignName).toBe('7 Eleven $5k Instant Win promotion')
+  expect(p.campaignName.toLowerCase().includes('untitled')).toBe(false)
+  expect(p.fields.find((f) => f.label === 'Geography')?.value).toBe('United States')
+})
+
+test('placeholder Untitled is replaced from concept', () => {
+  const concept = 'Instant win for Repco with a prize of $2k'
+  const intake = finalizeIntake(
+    {
+      campaign_name: 'Untitled promotion',
+      retailer: null,
+      brand: null,
+      regions: [],
+      assumptions: [],
+      missing_fields: [],
+      confidence_scores: {},
+      generated_summary: '',
+    },
+    concept
+  )
+  expect(intake.campaign_name).toContain('Repco')
+  expect(intake.campaign_name?.toLowerCase().includes('untitled')).toBe(false)
+  expect(intake.campaign_name?.toLowerCase()).toContain('instant')
 })
 
 console.log(`\n${passed} passed, ${failed} failed\n`)

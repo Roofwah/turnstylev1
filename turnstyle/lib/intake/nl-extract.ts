@@ -27,7 +27,7 @@ export type NlExtraction = {
   retailer: string | null
   storeCount: number | null
   storeRetailer: string | null
-  geography: 'AU' | 'NZ' | null
+  geography: 'AU' | 'NZ' | 'US' | null
   periodLabel: string | null
   startDate: string | null
   endDate: string | null
@@ -43,7 +43,34 @@ export type NlExtraction = {
 const KNOWN_RETAILERS = [
   'Repco', 'Bunnings', 'Supercheap Auto', 'Autobarn', 'Metcash', 'Tradelink',
   'NAPA', 'BCF', 'Rebel', 'Harvey Norman', 'JB Hi-Fi', 'Woolworths', 'Coles',
+  '7 Eleven', '7-Eleven',
 ]
+
+/** Compact money for campaign titles: 5000 → $5k */
+export function formatCompactPrize(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return ''
+  if (n >= 1_000_000 && n % 1_000_000 === 0) return `$${n / 1_000_000}m`
+  if (n >= 1000 && n % 1000 === 0) return `$${n / 1000}k`
+  if (n >= 1000) {
+    const k = Math.round(n / 100) / 10
+    if (Math.abs(k * 1000 - n) < 1) return `$${k}k`
+  }
+  return `$${Math.round(n).toLocaleString('en-AU')}`
+}
+
+function parseCompactMoney(amount: string, suffix?: string | null): number | null {
+  const n = parseFloat(amount.replace(/,/g, ''))
+  if (!Number.isFinite(n)) return null
+  const s = (suffix || '').toLowerCase()
+  if (s === 'k') return n * 1000
+  if (s === 'm') return n * 1_000_000
+  return n
+}
+
+function extractRetailerAlias(raw: string): string | null {
+  if (/7\s*[\/\-]\s*11|7[\-\s]?eleven|seven[\-\s]?eleven/i.test(raw)) return '7 Eleven'
+  return null
+}
 
 const KNOWN_BRANDS = [
   'Colgate', 'Valvoline', 'Energizer', 'STEDI', 'Rheem', 'Samsung', 'Weber',
@@ -103,8 +130,8 @@ function extractMonthYearPeriod(raw: string): {
 function extractPrize(raw: string): ExtractedPrize | null {
   // win purchase back / instantly win their purchase back, up to $250
   if (/win\s+(?:your|their|a)?\s*purchase\s+back|purchase\s+back/i.test(raw)) {
-    const cap = raw.match(/up\s+to\s+\$?\s*([\d,]+)/i)
-    const unit = cap ? parseFloat(cap[1].replace(/,/g, '')) : null
+    const cap = raw.match(/up\s+to\s+\$?\s*([\d,]+)\s*([kKmM])?/i)
+    const unit = cap ? parseCompactMoney(cap[1], cap[2]) : null
     return {
       type: 'major',
       description: unit != null ? `Purchase value refunded (up to $${unit.toLocaleString('en-AU')})` : 'Purchase value refunded',
@@ -119,32 +146,57 @@ function extractPrize(raw: string): ExtractedPrize | null {
     raw.match(
       /(?:chance\s+to\s+win|win)\s+(?:a|an)\s+(.+?)(?:\s+valued\s+at|\s+worth|\s+approximately\s+valued|\.|$)/i
     ) ||
-    raw.match(/win\s+\$?\s*([\d,]+(?:\.\d+)?)/i)
+    raw.match(/win\s+\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?\b/i)
 
   let description: string | null = null
   let quantity: number | null = 1
   let unit_value: number | null = null
 
-  if (winMatch && winMatch[1] && !/^[\d,]+$/.test(winMatch[1])) {
+  if (winMatch && winMatch[1] && !/^[\d,]+$/.test(winMatch[1]) && !/^[kKmM]$/.test(winMatch[1])) {
     description = winMatch[1]
       .replace(/\s+valued\s+at.*$/i, '')
       .replace(/\s+worth.*$/i, '')
       .trim()
   }
 
-  // cash prize: win $10,000
-  const cash = raw.match(/win\s+\$\s*([\d,]+)/i)
+  // cash prize: win $10,000 / win $5k
+  const cash = raw.match(/win\s+\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?\b/i)
   if (cash && !description) {
-    unit_value = parseFloat(cash[1].replace(/,/g, ''))
-    description = `$${unit_value.toLocaleString('en-AU')} cash`
+    unit_value = parseCompactMoney(cash[1], cash[2])
+    if (unit_value != null) {
+      description = `$${unit_value.toLocaleString('en-AU')} cash`
+    }
+  }
+
+  // prize of 5k / prize of $5,000 / a prize of 5000
+  const prizeOf = raw.match(
+    /prize\s+of\s+\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?\b/i
+  )
+  if (prizeOf) {
+    const v = parseCompactMoney(prizeOf[1], prizeOf[2])
+    if (v != null) {
+      unit_value = unit_value ?? v
+      if (!description) description = `$${v.toLocaleString('en-AU')} cash`
+    }
   }
 
   const valueMatch =
-    raw.match(/valued\s+at\s+(?:approximately\s+)?(?:AUD\s*)?\$?\s*([\d,]+(?:\.\d+)?)/i) ||
-    raw.match(/worth\s+(?:approximately\s+)?(?:AUD\s*)?\$?\s*([\d,]+(?:\.\d+)?)/i) ||
-    raw.match(/approximately\s+\$\s*([\d,]+(?:\.\d+)?)/i)
+    raw.match(/valued\s+at\s+(?:approximately\s+)?(?:AUD\s*|USD\s*)?\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?/i) ||
+    raw.match(/worth\s+(?:approximately\s+)?(?:AUD\s*|USD\s*)?\$?\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?/i) ||
+    raw.match(/approximately\s+\$\s*([\d,]+(?:\.\d+)?)\s*([kKmM])?/i)
   if (valueMatch) {
-    unit_value = parseFloat(valueMatch[1].replace(/,/g, ''))
+    unit_value = parseCompactMoney(valueMatch[1], valueMatch[2]) ?? unit_value
+  }
+
+  // bare $5k / 5k near prize/instant win context
+  if (unit_value == null && /prize|instant|win/i.test(raw)) {
+    const bare = raw.match(/\$\s*([\d,]+(?:\.\d+)?)\s*([kKmM])\b/) || raw.match(/\b([\d,]+)\s*([kK])\b/)
+    if (bare) {
+      unit_value = parseCompactMoney(bare[1], bare[2])
+      if (!description && unit_value != null) {
+        description = `$${unit_value.toLocaleString('en-AU')} cash`
+      }
+    }
   }
 
   // one major prize / 1 of 1
@@ -168,6 +220,81 @@ function extractPrize(raw: string): ExtractedPrize | null {
     unit_value,
     total_value: unit_value != null && quantity != null ? unit_value * quantity : unit_value,
   }
+}
+
+/**
+ * Build a customer-facing campaign title from extracted facts.
+ * Prefer "{Retailer/Brand} {$value} {Mechanic} promotion" when enough signal exists.
+ */
+export function suggestCampaignName(params: {
+  brand: string | null
+  retailer: string | null
+  prize: ExtractedPrize | null
+  drawFrequency: string | null
+  raw: string
+}): { name: string | null; suggested: boolean } {
+  const entity = params.brand || params.retailer
+  const isInstant =
+    /instant/i.test(params.drawFrequency ?? '') || /instant(?:ly)?\s+win/i.test(params.raw)
+  const prize = params.prize
+  const valuePart =
+    prize?.unit_value != null && prize.unit_value > 0
+      ? formatCompactPrize(prize.unit_value)
+      : ''
+  const desc = prize?.description?.replace(/\s*\(up to.*$/i, '').trim() || ''
+  const isCashOrValuePrize =
+    !desc ||
+    desc.startsWith('$') ||
+    /cash/i.test(desc) ||
+    /^\$?\d/i.test(desc)
+
+  if (desc && /purchase\s+value\s+refunded/i.test(desc)) {
+    return {
+      name: entity ? `${entity} Win Your Purchase Back` : 'Win Your Purchase Back',
+      suggested: true,
+    }
+  }
+
+  // Product prizes: "Win a Ford Ranger Raptor"
+  if (desc && !isCashOrValuePrize) {
+    const titled = desc.match(/^(a|an)\s+/i) ? `Win ${desc}` : `Win a ${desc}`
+    return { name: titled, suggested: true }
+  }
+
+  // Cash / value-led: e.g. 7 Eleven $5k Instant Win promotion
+  if (entity && valuePart && isInstant) {
+    return { name: `${entity} ${valuePart} Instant Win promotion`, suggested: true }
+  }
+
+  if (entity && valuePart) {
+    return {
+      name: `${entity} ${valuePart} ${isInstant ? 'Instant Win' : 'Prize'} promotion`,
+      suggested: true,
+    }
+  }
+
+  if (entity && isInstant) {
+    return { name: `${entity} Instant Win promotion`, suggested: true }
+  }
+
+  if (valuePart) {
+    return {
+      name: isInstant
+        ? `${valuePart} Instant Win promotion`
+        : `Win ${valuePart}`,
+      suggested: true,
+    }
+  }
+
+  if (entity) {
+    return { name: `${entity} promotion`, suggested: true }
+  }
+
+  if (isInstant) {
+    return { name: 'Instant Win promotion', suggested: true }
+  }
+
+  return { name: null, suggested: false }
 }
 
 function extractStores(raw: string): { count: number | null; retailer: string | null } {
@@ -236,12 +363,16 @@ export function extractFromNaturalLanguage(raw: string): NlExtraction {
   const entry = extractEntry(raw)
   const drawFrequency = extractDrawFrequency(raw)
 
-  let geography: 'AU' | 'NZ' | null = null
+  let geography: 'AU' | 'NZ' | 'US' | null = null
   if (/\baustralia\b|\bAU\b/i.test(raw)) geography = 'AU'
   else if (/\bnew zealand\b|\bNZ\b/i.test(raw)) geography = 'NZ'
+  else if (/\bunited states\b|\bUSA\b|\bU\.S\.A\.?\b|\bUS\b|\bhere in the us\b/i.test(raw)) {
+    geography = 'US'
+  }
 
-  // Retailer: from "X stores" or known retailer list — not invent brand from retailer
+  // Retailer: aliases (7/11), "X stores", or known retailer list — not invent brand from retailer
   let retailer =
+    extractRetailerAlias(raw) ||
     stores.retailer ||
     findNamedEntity(raw, KNOWN_RETAILERS)
 
@@ -262,19 +393,15 @@ export function extractFromNaturalLanguage(raw: string): NlExtraction {
     if (/\bstores?\b/i.test(raw)) brand = null
   }
 
-  // Campaign name
-  let campaignName: string | null = null
-  let campaignNameSuggested = false
-  if (prize?.description && /purchase\s+value\s+refunded/i.test(prize.description)) {
-    campaignName = 'Win Your Purchase Back'
-    campaignNameSuggested = true
-  } else if (prize?.description) {
-    const short = prize.description.replace(/\s*\(up to.*$/i, '').trim()
-    campaignName = short.match(/^(a|an)\s+/i) ? `Win ${short}` : `Win a ${short}`
-    // Avoid "Win a $10,000 cash"
-    if (short.startsWith('$')) campaignName = `Win ${short}`
-    campaignNameSuggested = true
-  }
+  const suggested = suggestCampaignName({
+    brand,
+    retailer,
+    prize,
+    drawFrequency,
+    raw,
+  })
+  const campaignName = suggested.name
+  const campaignNameSuggested = suggested.suggested
 
   if (stores.count != null) {
     notes.push(
@@ -337,6 +464,9 @@ export function applyNlExtractionToRegion(
   } else if (nl.geography === 'NZ') {
     out.region_name = 'NZ'
     out.country = 'New Zealand'
+  } else if (nl.geography === 'US') {
+    out.region_name = 'US'
+    out.country = 'United States'
   }
 
   return out
